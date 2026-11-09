@@ -69,10 +69,13 @@ static uint32_t nextUs = 0;   // drift-corrected sample schedule
 static uint32_t nReadFails = 0;
 static uint32_t nConsecFails = 0;
 static uint32_t nWindows = 0;
+static uint32_t nSamplesOk = 0;  // samples actually accepted into the window
 
 static int g_pending = -1;    // last raw winner, waiting for a second opinion
 static int g_state = -1;      // the class the LED is showing
 static bool g_sensorDead = false;
+static bool g_degraded = false;    // last window arrived too slowly to be believed
+static uint32_t g_winStartMs = 0;  // when the current window started filling
 
 static Adafruit_NeoPixel led(RGB_LED_COUNT, RGB_LED_PIN, NEO_GRB + NEO_KHZ800);
 
@@ -259,6 +262,25 @@ static void bootSweep() {
 }
 
 // ------------------------------------------------------------- inference -------
+// A window has to have arrived at the rate it was trained at. A dropped I²C read does not
+// shorten the window, it STRETCHES it: 250 samples delivered over 8 s instead of 2.5 s makes
+// every rate-like feature (jerk, zcr, the 0.15-0.90 Hz band) three times smaller, and the model
+// then reads a shake as breathing - silently wrong, with no way to see it on a board that has
+// no serial. So a stretched window is refused instead of believed: the decision is cleared and
+// the LED blinks amber until a clean window arrives. This is the same instinct as the
+// abstention extension - the device says it does not know rather than guessing.
+static bool windowTimingOk() {
+  const uint32_t nowMs = millis();
+  const uint32_t expectedMs =
+      (nWindows == 0) ? (uint32_t)WINDOW_MS
+                      : (1000UL * WINDOW_STRIDE_SAMPLES / MPU_SAMPLE_RATE_HZ);
+  const uint32_t tookMs = nowMs - g_winStartMs;
+  g_winStartMs = nowMs;
+  const bool ok = tookMs <= expectedMs + expectedMs / 2;  // 50 % of budget lost, then refuse
+  g_degraded = !ok;
+  return ok;
+}
+
 static void evaluateWindow() {
   float raw[IMU_FEATURES], logged[IMU_FEATURES], scaled[IMU_FEATURES], probs[MODEL_N_CLASSES];
 
@@ -360,9 +382,18 @@ void loop() {
   }
   nConsecFails = 0;
 
+  nSamplesOk++;
   appendSample(s);
   if (g_fill >= WINDOW_SAMPLES && g_sinceEval >= WINDOW_STRIDE_SAMPLES) {
-    evaluateWindow();
+    if (windowTimingOk()) {
+      evaluateWindow();
+    } else {
+      // The window took too long to fill (I²C dropouts): classify nothing rather than
+      // classify a stretched window, and say so on the LED.
+      g_state = -1;
+      g_pending = -1;
+    }
     slideWindow();
   }
+  if (g_degraded) indicateFault(millis());
 }
