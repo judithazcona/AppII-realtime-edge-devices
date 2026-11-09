@@ -22,11 +22,55 @@ so that a session can be re-recorded identically, or a lost dataset rebuilt.
 | [`../firmware/config.h`](../firmware/config.h) | sample rate, ranges, scales, window size — **the firmware is the source of truth for these**, and it sends them in its own header, so no number is duplicated in Python |
 | [`../firmware/README.md`](../firmware/README.md) | the exact `arduino-cli` compile/upload commands |
 
-## Recording protocol for stage 1 (the two classes of the first demo)
+## What is on disk today (recorded 2026-11-09, this dataset produced `docs/RESULTS.md`)
 
-Stage 1 only needs `not_attached` and `shaking` — that is the 2.5-point movement-vs-shaking
-demo. **Chest classes (`calm_breathing`, `fast_breathing`) are refused by the recorder until
-step 7**, so nobody records a chest take and has it quietly mixed into stage-1 data.
+`uv run python training/record.py --list` prints this; the metadata columns below are copied from
+the CSV headers, not from memory. Split = the committed
+[`training/split_assignment.json`](../training/split_assignment.json).
+
+| file (in `data/raw/`, not committed) | s | person | placement | split |
+| --- | --- | --- | --- | --- |
+| `session001_calm_breathing__calm_sitting` | 60 | sami | breadboard pressed on the sternum, sitting upright | train |
+| `session002_calm_breathing__calm_judith` | 60 | judith | breadboard pressed on the sternum, sitting upright | **test** |
+| `session001_fast_breathing__fast_sitting` | 60 | sami | same placement, fast shallow breathing | train |
+| `session002_fast_breathing__fast_judith` | 60 | judith | same placement, fast shallow breathing | **test** |
+| `session002_not_attached__table_still` | 45 | judith | lying completely still on the table, untouched | train |
+| `session003_not_attached__hand_loose` | 45 | judith | held loosely in the hand, slow natural movements | train |
+| `session004_not_attached__lap_pocket` | 45 | yaren | on the lap / in a jacket pocket, small body movements | **test** |
+| `session005_not_attached__pickup_putdown` | 45 | judith | picked up and set down on different surfaces | val |
+| `session003_shaking__side_to_side` | 45 | judith | one axis only | train |
+| `session004_shaking__wobble_rotation` | 45 | yaren | rotating wobble | train |
+| `session001_shaking__gentle_small` | 45 | judith | small gentle shake | val |
+| `session002_shaking__vigorous_arm` | 45 | judith | vigorous full-arm shake | **test** |
+
+**12 usable sessions: 4 + 4 + 2 + 2.** Three weaknesses that the numbers in `docs/RESULTS.md`
+inherit, in order of damage:
+
+1. **Two breathing sessions each** → one to fit on, one to hold out. Every calm/fast metric rests
+   on one session of one person.
+2. **`not_attached` in a lap pocket is held out and scores 26 % recall** — the model reads a board
+   carried on a person as breathing. What is missing is not a cleverer model: it is more
+   `not_attached` takes *on a moving person* (walking, sitting down, adjusting the board), plus
+   breathing from more people and a second placement (abdomen, pocket-over-shirt) so "on a person"
+   stops being a synonym for "breathing".
+3. **Person coverage is uneven**: Sami appears only in the breathing pair; the shaking takes are
+   almost all Judith's. "All three members appear in the data" is true; "the model is
+   person-independent" is not.
+
+**No usable `novel_*` material exists yet** — the only novel file is a 12 s smoke test
+(`usable: no`). The abstention extension of step 10 needs `novel_tapping` / `novel_rolling` /
+`novel_walking` recorded for real, and they cannot be invented afterwards.
+
+## Recording protocol
+
+The chest classes were closed to the recorder until the stage-1 (movement vs shaking) data was in
+the bag, so a mis-recorded chest take could not contaminate the first demo; they opened afterwards
+and are what rows 1–4 above are. Chest specifics: hold or tape the board flat on the sternum,
+`record.py` prints the reminder for those two classes, and the subject must not talk or cough —
+a cough is a wideband transient that the classifier cannot tell from a shake.
+
+The target list the protocol asks for — the first two rows were met in full, the breathing classes
+got 60 s takes and only 2 each, and the `novel_*` rows are still open:
 
 | Class | Sessions | Length each | What to vary |
 | --- | --- | --- | --- |
@@ -38,8 +82,9 @@ step 7**, so nobody records a chest take and has it quietly mixed into stage-1 d
 
 Rules that keep the dataset honest:
 
-- **All three group members appear in the data.** Set `--person` correctly; one person's
-  breathing or shake is not the class, it is that person's shake.
+- **All three group members should appear in every class.** Set `--person` correctly; one person's
+  breathing or shake is not the class, it is that person's shake. Today they do not: Sami is only
+  in the breathing pair, so treat person-independence as unproven (see the weaknesses above).
 - **Keep each session pure**: one class from `GO` to the end. Transitions at the edges cost
   labels, so start the motion during the countdown, not after it.
 - **`walking` and `tapping` stay in the `novel_*` files only.** They are the held-out

@@ -147,12 +147,13 @@ $p.Close()
 
 | Sketch | Uses `Serial`? | Purpose | Proof it gave |
 | --- | --- | --- | --- |
-| [`bench_test/`](bench_test/bench_test.ino) | **yes — the only sketch allowed to** (rule 7) | I²C scan, `WHO_AM_I`, 10 s accel/gyro table | one device at `0x68`; `WHO_AM_I` = `0x68` (genuine MPU-6050); 909 good reads / 0 failed at 100 Hz; gravity 0.98–0.99 g at rest |
+| [`bench_test/`](bench_test/bench_test.ino) | **yes — development only** (rule 7: three sketches may, the demo may not) | I²C scan, `WHO_AM_I`, 10 s accel/gyro table | one device at `0x68`; `WHO_AM_I` = `0x68` (genuine MPU-6050); 909 good reads / 0 failed at 100 Hz; gravity 0.98–0.99 g at rest |
 | [`led_test/`](led_test/led_test.ino) | **no** | drives red, green, blue, magenta on GPIO 48, then tries GPIO 38, forever, on power alone | the on-board LED lit on **GPIO 48**; GPIO 38 stayed dark — observed by Judith at 14:35 |
-| [`data_recorder/`](data_recorder/data_recorder.ino) | **yes — the second and last exception** (rule 7) | streams accel + gyro at a fixed 100 Hz as CSV rows for the dataset | **100.00 Hz delivered** (1200 samples in 11.99 s), median dt 10.00 ms, p99 10.01 ms, **0 gaps** |
-| [`classifier/`](classifier/classifier.ino) | **no** | the graded firmware: 100 Hz sampling → 24 features → exported MLP → smoothed decision → LED colour | compiles to **323042 bytes (24 %)** flash, **29664 bytes (9 %)** RAM; `grep -c Serial` reads **0**; not uploaded yet, `COM4` was held by the recorder |
-| [`config.h`](config.h) | — | pins, I²C address, full-scale ranges, sample rate, window size | shared by every sketch; paired with `HARDWARE.md` |
-| [`features.h`](features.h) / [`model_infer.h`](model_infer.h) | — | the 24 window features and the MLP forward pass, in C | same formulas as `training/features.py`; included by `classifier` only |
+| [`data_recorder/`](data_recorder/data_recorder.ino) | **yes — labelled dataset collection, cable attached on purpose** (rule 7) | streams accel + gyro at a fixed 100 Hz as CSV rows for the dataset | **100.00 Hz delivered** (1200 samples in 11.99 s), median dt 10.00 ms, p99 10.01 ms, **0 gaps** |
+| [`classifier/`](classifier/classifier.ino) | **no** | the graded firmware: 100 Hz sampling → 26 features → exported MLP → smoothed decision → LED colour **+ BLE notify** | compiles to **578 953 bytes (44 %)** flash, **40 180 bytes (12 %)** RAM with BLE; without BLE 327 578 / 29 664; `grep -c Serial` reads **0** |
+| [`debug_pipeline/`](debug_pipeline/debug_pipeline.ino) | **yes — third and last exception** (rule 7) | temporary: the identical pipeline with `[sensor] [window] [feature] [model] [state] [ble]` logs | sensor 99.86 Hz / 0 read failures, features and probabilities plausible, `notify=OK` with `subscribed=0` — root cause of the "stuck value" was client-side CCCD. **Delete once the pipeline is proven**; 590 337 bytes |
+| [`config.h`](config.h) | — | pins, I²C address, full-scale ranges, sample rate, window size, BLE name + UUIDs | shared by every sketch; paired with `HARDWARE.md` and `docs/BLE.md` |
+| [`features.h`](features.h) / [`model_infer.h`](model_infer.h) | — | the 26 window features and the MLP forward pass, in C | same formulas as `training/features.py`; included by `classifier` only |
 
 `led_test` is deliberately written with **zero** `Serial` calls: it is the standing check that
 this firmware family reaches its working state from a power bank with no host attached
@@ -162,24 +163,36 @@ demo sketch, so the absence of the token is what proves the cable can stay unplu
 ### 7.1 `classifier/` — the graded build
 
 ```powershell
-& $CLI compile --fqbn $FQBN firmware/classifier   # 323042 bytes (24%), 29664 bytes (9%) RAM
-& $CLI upload  -p COM4 --fqbn $FQBN firmware/classifier   # NOT RUN YET: COM4 held by record.py
+& $CLI compile --fqbn $FQBN firmware/classifier   # 578953 bytes (44%), 40180 bytes (12%) RAM — with BLE
+& $CLI upload  -p COM4 --fqbn $FQBN firmware/classifier
 ```
 
-The chain, all on the chip: MPU-6050 at 100 Hz → 250-sample window (2.5 s) re-run every 125
-samples → the 24 features from `features.h` → `log1p` and standardisation with the parameters
-`train.py` fitted on **train sessions only** → the MLP in `model_infer.h` → two agreeing
-windows in a row → one colour. `config.h` supplies the pins and the rate, `model_weights.h`
-supplies the class names, and the sketch maps names to colours, so re-exporting a 4-class model
-needs no edit here.
+Upload history, because "it is flashed" is a claim about a chip and not about a commit: the
+no-BLE and then the BLE build were uploaded to `COM4` during the lab; the build **with the
+window-timing guard has not been uploaded** — `arduino-cli board list` returns *No boards found*
+and the upload printed `Could not open COM4 ... FileNotFoundError(2)`. Re-run the `upload` line
+above before the demo, and see [`../docs/TESTING.md`](../docs/TESTING.md) §6.
 
-Three `static_assert`s refuse to build if `config.h` and the exported header disagree about the
+The chain, all on the chip: MPU-6050 at 100 Hz → 250-sample window (2.5 s) re-run every 125
+samples → the 26 features from `features.h` → `log1p` and standardisation with the parameters
+`train.py` fitted on **train sessions only** → the MLP in `model_infer.h` → two agreeing
+windows in a row → one colour **and one BLE notification**. `config.h` supplies the pins, the
+rate and the BLE UUIDs, `model_weights.h` supplies the class names, and the sketch maps names to
+colours, so re-exporting a 4-class model needs no edit here.
+
+Five `static_assert`s refuse to build if `config.h` and the exported header disagree about the
 window, the stride, the sample rate or the feature count — the drift that would otherwise show
 up as "the board disagrees with the notebook".
 
-If the sensor stops answering (cable pulled, I²C dead), the LED blinks **amber** at ~1.7 s
-period instead of freezing on the last state. There is no serial to complain into, so the LED
-carries that message too.
+Two failure modes the LED reports, because there is no serial to complain into:
+
+* sensor silent (cable pulled, I²C dead) → **amber** blink at ~1.7 s, decision cleared;
+* a window that took **more than 1.5× its nominal time** to fill — intermittent I²C dropouts
+  stretch a 2.5 s window to 6–10 s, shrinking every rate-like feature ~3× — is **refused**, not
+  classified, and blinks amber until a clean window arrives. Found by the `debug_pipeline` trace.
+
+BLE is part of this sketch, not a separate build: device name, service and characteristic UUID,
+value encoding and notification timing are in [`../docs/BLE.md`](../docs/BLE.md).
 
 ## 8. Recording dataset sessions (cable attached on purpose)
 

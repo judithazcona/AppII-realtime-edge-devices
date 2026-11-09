@@ -38,8 +38,11 @@ no notification for ~3 s means the link or the board died, rather than a stable 
 
 ## Reading it from a browser (Web Bluetooth)
 
-Web Bluetooth needs a secure context, which is why the monitor page is served over **HTTPS from
-GitHub Pages**, not from the board's own hotspot. Device selection must start from a click.
+Web Bluetooth needs a secure context, which is why the monitor page has to be served over **HTTPS
+from GitHub Pages** — the board's own plain-HTTP hotspot page cannot use Web Bluetooth at all.
+Device selection must start from a click or tap. **That Pages repository does not exist yet**, so
+the snippet below is the contract the page will use, written against the firmware that is already
+flashed, not a description of a deployed page.
 
 ```js
 const SERVICE = '53bc7f1a-6719-4a10-917d-11be1aba66a3';
@@ -66,9 +69,16 @@ A central disconnecting does **not** need a power cycle: `onDisconnect` calls
 No raw samples, no probabilities, no window buffers. The state string is the whole contract, and
 it is computed on the chip (`firmware/features.h` + `firmware/model_infer.h`) — BLE only carries
 the verdict. Nothing in the sketch waits for a host, and there is no USB serial in it at all
-(`grep -c Serial` reads 0), so it runs from a power bank with the monitor page open on another
-machine.
+(`grep -c Serial` reads 0), so it is *written* to run from a power bank with the monitor page open
+on another machine. **That acceptance test has not been performed yet** — `TESTING.md` §7 row 2,
+and rule 11 says show it rather than assert it.
 
-Measured with this build: **578221 bytes (44 %)** flash, **40172 bytes (12 %)** RAM
-(`esp32:esp32:esp32s3:FlashMode=dio,FlashSize=16M,PSRAM=disabled,CDCOnBoot=default`) — the BLE
-stack is most of the flash growth over the 327578-byte non-BLE build.
+Measured with this build: **578 953 bytes (44 %)** flash, **40 180 bytes (12 %)** RAM
+(`esp32:esp32:esp32s3:FlashMode=dio,FlashSize=16M,PSRAM=disabled,CDCOnBoot=default`, the
+window-timing-guard build) — the BLE stack is most of the flash growth over the 327 578-byte
+non-BLE build.
+
+Verified server-side, **not** verified client-side: the log line
+`[ble] heartbeat value='not_attached' subscribed=0 notify=OK total=92` shows the board notifying
+and no client having written the CCCD, which is why a phone app that never enabled Notify saw a
+frozen value. See [`TESTING.md`](TESTING.md) §4.
