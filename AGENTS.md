@@ -58,7 +58,9 @@ no microphone: motion sensors only.
    `monitor`) plus the library list, so another person can rebuild the device on a clean
    machine — that is part of the graded documentation.
 7. **USB logging is a development tool.** Serial output is fine while building, but it must sit
-   behind a compile-time switch, and the demo build must not need it (constraint 2 below).
+   behind a compile-time switch, and the demo build must not need it (constraint 11 below).
+   Right now `firmware/bench_test` is the **only** sketch allowed to use `Serial`; every other
+   sketch — including `firmware/led_test` — must work with no host attached at all.
 
 ## Reproducibility
 
@@ -146,3 +148,15 @@ no microphone: motion sensors only.
       commit a single file over ~2 MB.
     - If a secret does get pushed, say so immediately so the history can be dealt with, and treat
       the credential as burned and change it.
+
+## Wiring
+
+21. **`HARDWARE.md` is the truth about the wiring — update it together with
+    [`firmware/config.h`](firmware/config.h)**, in the same commit. A pin that appears in one
+    and not the other is a bug, and a stale `HARDWARE.md` is worse than none, because someone
+    will trust it while debugging with a multimeter in their hand.
+    - Never guess a pin. It comes from how we actually wired it, from the silkscreen, or from a
+      bench measurement — and the measurement is recorded in `HARDWARE.md` with what was run.
+    - Values in `config.h` are referenced by the firmware, never re-hard-coded in a sketch.
+    - Anything still unknown is written as unknown (see the LED row in `HARDWARE.md`), not
+      filled in with a plausible number.

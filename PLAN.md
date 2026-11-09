@@ -20,10 +20,10 @@ Status: **2026-11-09, 13:47** — mid-lab. The lab runs **13:00–17:00**. Rules
    invitations one.
 
 2. **At least 3 intermediate commits during the lab, each pushed to GitHub as we go.**
-   Current status: ⚠️ **2 pushed and verified** (`2465333`, `9f71414`) — **one short of the
-   minimum**, so step 3 must be pushed before anything else is attempted. Nine more are
-   planned, one per step. This file's COMMIT TRACKER is the evidence; update it in the same
-   commit as each step.
+   Current status: ✅ **minimum met — 4 intermediate commits pushed and verified**
+   (`2465333`, `9f71414`, `bec06c2`, and this one). Keeping the pace anyway: the plan has 8
+   more steps, one commit each, and the rule says "as we go", so no step is ever parked
+   uncommitted. This file's COMMIT TRACKER is the evidence.
 
 ## Lab clock
 
@@ -32,8 +32,8 @@ Status: **2026-11-09, 13:47** — mid-lab. The lab runs **13:00–17:00**. Rules
 | Lab start | **13:00** (confirmed) |
 | Lab length | 4 hours |
 | Lab end | **17:00** |
-| Now | 13:47 → **3 h 13 min of lab time left** |
-| **Commits pushed since lab start** | **2** — `git rev-list --count origin/judithbranch --since='2026-11-09T13:00:00+01:00'` |
+| Now | 14:40 → **2 h 20 min of lab time left** |
+| **Commits pushed since lab start** | **4** counting this one (3 existed before it) — `git rev-list --count origin/judithbranch --since='2026-11-09T13:00:00+01:00'`, re-run after every push |
 
 > Print that count every time this tracker is updated (rule 9); it is the evidence for
 > compulsory rule 2. The minimum is 3, so the count must read **3 or more well before 16:30**,
@@ -49,8 +49,8 @@ step is run and shown immediately after that step's push.
 | --- | --- | --- | --- | --- |
 | 1 | Repo skeleton, working rules, plan, gitignore | `2465333` | 2026-11-09 13:20:56 +01:00 | yes — `ls-remote` hash matched local |
 | 2 | Plan and rules fixed for the MPU-6050 assignment | `9f71414` | 2026-11-09 13:43:59 +01:00 | yes — `ls-remote` + `gh api` both showed `9f714143f1…` |
-| 2b | Toolchain, lab clock, LED and extension decided | this commit (hash recorded in #3) | recorded in #3 | yes — proof run right after this push |
-| 3 | Wiring and sensor check (I²C scan, live accel + gyro) | — | — | no |
+| 2b | Toolchain, lab clock, LED and extension decided | `bec06c2` | 2026-11-09 14:06:39 +01:00 | yes — `ls-remote` + `gh api` both showed `bec06c2ee8…` |
+| 3 | Wiring and sensor check: `HARDWARE.md`, `config.h`, `bench_test`, `led_test` | this commit (hash recorded in #4) | recorded in #4 | yes — proof run right after this push |
 | 4 | Data recorder (labelled sessions, CSV off-repo) | — | — | no |
 | 5 | Trained model and honest evaluation | — | — | no |
 | 6 | Firmware on the board: movement vs shaking | — | — | no |
@@ -133,7 +133,14 @@ we wire the breadboard.
   so shaking does not saturate) and gyro range, read accel + gyro at a fixed rate, print to
   serial *while developing* (USB logging is a dev tool only — constraint 2).
 - Sanity checks: gravity axis ≈ 1 g at rest, tap test, rotate-in-hand for the gyro.
-- **Proof:** raw numbers on the serial monitor, and a 60-second file of a known-still board.
+- **Result, 14:35 — DONE.** Board on **COM4** through a WCH CH9102 bridge, no driver install
+  needed. I²C scan found one device at `0x68`; `WHO_AM_I` = **`0x68`** (genuine MPU-6050);
+  10 s stream at 100 Hz gave **909 good reads / 0 failed** with gravity at 0.98–0.99 g.
+  `esptool flash_id` confirmed **16 MB flash** and 8 MB embedded PSRAM; chip is ESP32-S3
+  QFN56 rev v0.2. The on-board RGB LED answers on **GPIO 48**, GPIO 38 stayed dark.
+  All of it is written up in `HARDWARE.md`, with the pin in `firmware/config.h`.
+  Full evidence in the verification log below. **Not** done in this step: the tap and
+  rotate-in-hand checks (nobody watched them) and `docs/wiring.jpg`.
 
 ### Step 4 — data recorder
 - Record labelled sessions from the PC-linked board over USB (allowed for data collection —
@@ -318,7 +325,13 @@ nRF Connect and explain the Web Bluetooth secure-context requirement.
 | `.gitignore` really ignores data/secrets | created `probe.wav`-equivalent probe files, `git check-ignore -v`, then deleted | matched `*.wav`, `.env`, `secrets.h`, `.venv/`; none in `git status` (audio patterns now replaced by IMU ones) |
 | `tomasvicar` access (compulsory rule 1) | `gh api .../collaborators`, `gh api .../invitations` | ❌ **pending** — invitation `342422359` for `tomasvicar` exists and has not expired, but he is not in the collaborators list yet |
 | Repo visibility | `gh repo view --json visibility` | `PUBLIC` (confirmed intended by Judith) |
-| (steps 3–11 to be filled as they run) | | |
+| Toolchain installed and usable | `arduino-cli version`, `core list`, `lib list`, `board details --fqbn esp32:esp32:esp32s3` | arduino-cli 1.5.2-rc.1, `esp32:esp32 3.3.12`, NimBLE-Arduino 2.3.9, Adafruit NeoPixel 1.15.4; FQBN resolves to **ESP32S3 Dev Module** |
+| Board detected, driver needed? | `arduino-cli board list`; `Get-PnpDevice` | **COM4**, `USB\VID_1A86&PID_55D3` = WCH **CH9102** bridge, status `OK` → **no driver install, no admin rights used** |
+| I²C wiring and sensor | `firmware/bench_test` flashed to COM4, serial captured | scan: one device **0x68**; **WHO_AM_I = 0x68** (genuine); **909 good reads, 0 failed** in 10 s; gravity **0.98–0.99 g** at rest → **PASS** |
+| Flash size / PSRAM / chip | `esptool --chip esp32s3 -p COM4 flash_id` | **16 MB flash detected**, **8 MB embedded PSRAM**, ESP32-S3 QFN56 rev v0.2 → the `16M` build setting is measured, not assumed |
+| RGB LED data pin | `firmware/led_test` (compiled with **no** `Serial` at all), observed by Judith | **GPIO 48** shows red/green/blue/magenta; **GPIO 38 dark** → `RGB_LED_PIN 48` in `config.h` |
+| Firmware really on the chip | `arduino-cli upload` output | `Hash of data verified` on every flash of `bench_test` and `led_test` |
+| (steps 4–11 to be filled as they run) | | |
 
 ## Decided by Judith (13:45)
 

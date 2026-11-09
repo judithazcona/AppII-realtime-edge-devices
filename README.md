@@ -35,8 +35,10 @@ One device recognises all four, shown on the RGB LED:
 | Breadboard + jumper wires | wiring |
 | USB cable | **power only in the demo** — no data over it, nothing computed on the PC |
 
-> **Wiring photo:** _TODO — add `docs/wiring.jpg` and show it here (required for the
-> documentation part)._
+![Wiring of the ESP32-S3 N16R8 with the GY-521 on the breadboard](docs/wiring.jpg)
+
+> **Wiring photo:** `docs/wiring.jpg` — still to be taken; until then the line above shows a
+> broken image. The pin-by-pin table lives in [`HARDWARE.md`](HARDWARE.md).
 
 ## What it looks like when it runs
 
@@ -79,8 +81,9 @@ measurements land here with step 10 of [`PLAN.md`](PLAN.md).
 | --- | --- | --- |
 | `AGENTS.md` | Working rules, including the two compulsory rules that decide the grade | done |
 | `PLAN.md` | States, grading, hard constraints, commit tracker, time plan, demo script, open questions | done |
-| `docs/` | Wiring photo, figures and notes for the write-up | empty so far |
-| `firmware/` | ESP32-S3 firmware: sensor, features, model, LED, BLE, web server | planned |
+| [`HARDWARE.md`](HARDWARE.md) | **The truth about the wiring**: pin table, USB bridge, board build settings, what is measured vs assumed — kept in step with `firmware/config.h` | done |
+| `docs/` | Wiring photo (`docs/wiring.jpg`), figures and notes for the write-up | photo pending |
+| `firmware/` | ESP32-S3 firmware: sensor, features, model, LED, BLE, web server. `config.h` holds the pins; `bench_test` and `led_test` are the bring-up checks | bring-up running |
 | `training/` | Data loading, features, training and evaluation scripts | planned |
 | `data/` | Only `data/README.md` — raw recordings stay off the repo (rule 16) | planned |
 
