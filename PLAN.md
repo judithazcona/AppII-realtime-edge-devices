@@ -38,7 +38,7 @@ Status: **2026-11-09, 15:25** — mid-lab, **~65 min behind the 13:50 plan** (re
 | Lab start | **13:00** (confirmed) |
 | Lab length | 4 hours |
 | Lab end | **17:00** |
-| Now | 16:38 → **22 min of lab time left** |
+| Now | 16:20 (from `date`, not from an estimate — an earlier row of this table carried a guessed clock and was corrected) → **40 min of lab time left** |
 | **Commits pushed since lab start** | **12** counting this one (11 already local+pushed: `2465333` `9f71414` `bec06c2` `bb53ade` `6d11b52` `10374fc` `d1e02ff` `706a8a7` `0df21a9` `cbc1fb6` `81b5e49`) — `git rev-list --count origin/judithbranch --since='2026-11-09T13:00:00+01:00'`, re-run after every push |
 | Remaining work, in the order that keeps the marks | (1) **upload `firmware/classifier` and watch the LED** — step 6 is not done until the hardware changes colour, and it is 2.5 + 2.5 points of the grade; (2) re-export 4-class once there are >= 4 chest sessions per class and repeat; (3) BLE + board web page + abstention only if time survives. Compulsory rules are already safe: `tomasvicar` is a collaborator and 12 commits are pushed. |
 
