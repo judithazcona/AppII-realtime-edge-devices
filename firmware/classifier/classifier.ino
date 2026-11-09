@@ -83,9 +83,16 @@ static Adafruit_NeoPixel led(RGB_LED_COUNT, RGB_LED_PIN, NEO_GRB + NEO_KHZ800);
 // once a second as a heartbeat, which is also how a browser tells the board went away.
 static NimBLECharacteristic *g_stateChr = nullptr;
 static uint32_t lastBeatMs = 0;
+static bool g_subscribed = false;  // did a client write 0x0001 to the CCCD?
 static const uint32_t HEARTBEAT_MS = 1000;
 
+static const char *stateText();
+static void publishState();
+
 class ServerCbs : public NimBLEServerCallbacks {
+  void onConnect(NimBLEServer *, NimBLEConnInfo &) override {
+    publishState();  // a client that just connected reads at once, not after the next second
+  }
   void onDisconnect(NimBLEServer *, NimBLEConnInfo &, int) override {
     // A monitor page that loses the link must be able to come back without a power cycle, so
     // advertising restarts the moment the client leaves.
@@ -93,6 +100,22 @@ class ServerCbs : public NimBLEServerCallbacks {
   }
 };
 static ServerCbs g_serverCbs;
+
+// The CCCD is created by NimBLE with the NOTIFY property; this is the callback that fires when
+// the client writes 0x0001 to it (i.e. when the app switches notifications on). Pushing the
+// current state right there means the app shows a live value the instant it subscribes, instead
+// of sitting on whatever it read during discovery until the next heartbeat.
+class StateCbs : public NimBLECharacteristicCallbacks {
+  void onSubscribe(NimBLECharacteristic *, NimBLEConnInfo &, uint16_t subValue) override {
+    if (subValue != 0) {
+      g_subscribed = true;
+      publishState();
+    } else {
+      g_subscribed = false;
+    }
+  }
+};
+static StateCbs g_stateCbs;
 
 static void startBle() {
   NimBLEDevice::init(BLE_DEVICE_NAME);
@@ -102,6 +125,10 @@ static void startBle() {
   g_stateChr = svc->createCharacteristic(BLE_STATE_CHAR_UUID,
                                          NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY,
                                          BLE_STATE_MAX_LEN);
+  // NOTIFY here is what makes NimBLE publish the CCCD (0x2902) descriptor for this
+  // characteristic; without that property the app sees a read-only value and reports
+  // "notifications and indications disabled", which is exactly the symptom being fixed.
+  g_stateChr->setCallbacks(&g_stateCbs);  // onSubscribe: push the state the moment CCCD = 0x0001
   svc->start();
   // What a scanner actually sees. The 128-bit service UUID takes 19 of the 31 advertising bytes,
   // so the 15-byte name does NOT fit in the same packet: the name goes in the SCAN RESPONSE and
@@ -127,8 +154,16 @@ static const char *stateText() {
 
 static void publishState() {
   if (g_stateChr == nullptr) return;
-  g_stateChr->setValue(stateText());  // READ is always current, connected or not
-  if (NimBLEDevice::getServer()->getConnectedCount() > 0) g_stateChr->notify();
+  const char *text = stateText();
+  const size_t len = strlen(text);
+  if (len == 0) return;  // before the first window: send nothing rather than a fake state,
+                         // and never a zero-length notification some stacks dislike
+  g_stateChr->setValue((uint8_t *)text, len);  // plain UTF-8, exact length, no newline
+  // notify() is called unconditionally: NimBLE drops it when nobody has written the CCCD, and
+  // gating on getConnectedCount() here was the bug that kept NB Devices looking frozen - the
+  // count can be 0 for a link that is still coming up, so the first notifications were skipped
+  // and the app sat on the value it read during discovery.
+  g_stateChr->notify();
 }
 
 // ------------------------------------------------------------- MPU-6050 --------
