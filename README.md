@@ -108,14 +108,16 @@ the on-board addressable RGB LED. Everything installs into the user folder, no a
 rights:
 
 ```powershell
-arduino-cli core install esp32:esp32
+arduino-cli core install esp32:esp32                              # 3.3.12
 arduino-cli lib install "NimBLE-Arduino" "Adafruit NeoPixel"
-arduino-cli compile --fqbn esp32:esp32:esp32s3 firmware/<sketch>
-arduino-cli upload  -p COMx --fqbn esp32:esp32:esp32s3 firmware/<sketch>
+$FQBN = "esp32:esp32:esp32s3:FlashMode=dio,FlashSize=16M,PSRAM=disabled,CDCOnBoot=default"
+arduino-cli compile --fqbn $FQBN firmware/<sketch>
+arduino-cli upload  -p COM4 --fqbn $FQBN firmware/<sketch>
 ```
 
-_TODO — the exact sketch names, the I²C pins, the LED GPIO and the sample rate go here as the
-steps in `PLAN.md` land; `firmware/README.md` will hold the authoritative commands._
+[`firmware/README.md`](firmware/README.md) holds the authoritative commands — the FQBN above is
+the one every build here uses, with each option marked measured or assumed — and
+[`HARDWARE.md`](HARDWARE.md) the pins (I²C on GPIO 8/9, `0x68`, LED on GPIO 48).
 
 Every script sets its random seeds from one shared constant, so re-running a training script on
 the same recordings reproduces the same metrics.

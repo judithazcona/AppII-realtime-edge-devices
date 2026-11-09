@@ -1,7 +1,7 @@
 # PLAN
 
 Real-time AI on a microcontroller — ESP32-S3 N16R8 + MPU-6050 (GY-521).
-Status: **2026-11-09, 13:47** — mid-lab. The lab runs **13:00–17:00**. Rules in
+Status: **2026-11-09, 15:05** — mid-lab. The lab runs **13:00–17:00**. Rules in
 [`AGENTS.md`](AGENTS.md).
 
 ## COMPULSORY — either one missed = 0 points for the whole project
@@ -20,8 +20,10 @@ Status: **2026-11-09, 13:47** — mid-lab. The lab runs **13:00–17:00**. Rules
    invitations one.
 
 2. **At least 3 intermediate commits during the lab, each pushed to GitHub as we go.**
-   Current status: ✅ **minimum met — 4 intermediate commits pushed and verified**
-   (`2465333`, `9f71414`, `bec06c2`, and this one). Keeping the pace anyway: the plan has 8
+   Current status: ✅ **minimum met with room to spare — 6 commits pushed and verified**
+   (`2465333` 13:20, `9f71414` 13:43, `bec06c2` 14:06, `bb53ade` 14:33, `6d11b52` 14:47, and this
+   one at 15:01). The minimum was already met at 14:06, i.e. nearly three hours before the deadline.
+   Keeping the pace anyway: the plan has 7
    more steps, one commit each, and the rule says "as we go", so no step is ever parked
    uncommitted. This file's COMMIT TRACKER is the evidence.
 
@@ -32,8 +34,8 @@ Status: **2026-11-09, 13:47** — mid-lab. The lab runs **13:00–17:00**. Rules
 | Lab start | **13:00** (confirmed) |
 | Lab length | 4 hours |
 | Lab end | **17:00** |
-| Now | 14:40 → **2 h 20 min of lab time left** |
-| **Commits pushed since lab start** | **4** counting this one (3 existed before it) — `git rev-list --count origin/judithbranch --since='2026-11-09T13:00:00+01:00'`, re-run after every push |
+| Now | 15:05 → **1 h 55 min of lab time left** |
+| **Commits pushed since lab start** | **6** counting this one (5 were already on GitHub: `2465333` `9f71414` `bec06c2` `bb53ade` `6d11b52`) — `git rev-list --count origin/judithbranch --since='2026-11-09T13:00:00+01:00'`, re-run after every push |
 
 > Print that count every time this tracker is updated (rule 9); it is the evidence for
 > compulsory rule 2. The minimum is 3, so the count must read **3 or more well before 16:30**,
@@ -50,7 +52,9 @@ step is run and shown immediately after that step's push.
 | 1 | Repo skeleton, working rules, plan, gitignore | `2465333` | 2026-11-09 13:20:56 +01:00 | yes — `ls-remote` hash matched local |
 | 2 | Plan and rules fixed for the MPU-6050 assignment | `9f71414` | 2026-11-09 13:43:59 +01:00 | yes — `ls-remote` + `gh api` both showed `9f714143f1…` |
 | 2b | Toolchain, lab clock, LED and extension decided | `bec06c2` | 2026-11-09 14:06:39 +01:00 | yes — `ls-remote` + `gh api` both showed `bec06c2ee8…` |
-| 3 | Wiring and sensor check: `HARDWARE.md`, `config.h`, `bench_test`, `led_test` | this commit (hash recorded in #4) | recorded in #4 | yes — proof run right after this push |
+| 3 | Wiring and sensor check: `HARDWARE.md`, `config.h`, `bench_test`, `led_test` | `bb53ade` | 2026-11-09 14:33:57 +01:00 | yes — `ls-remote` + `gh api` both showed `bb53ade`, proof run right after the push |
+| 3b | Wiring photo: `docs/wiring.jpg` compressed to 93 KB, EXIF/GPS stripped | `6d11b52` | 2026-11-09 14:47:49 +01:00 | yes — `ls-remote` = local HEAD, `gh api` newest = `6d11b52`, and the rendered README contains `<img src="docs/wiring.jpg">` |
+| 3c | `firmware/README.md` with the exact arduino-cli commands; close the step-3 leftovers in this plan | this commit (hash recorded in the next row) | recorded in the next row | yes — proof run right after this push |
 | 4 | Data recorder (labelled sessions, CSV off-repo) | — | — | no |
 | 5 | Trained model and honest evaluation | — | — | no |
 | 6 | Firmware on the board: movement vs shaking | — | — | no |
@@ -116,12 +120,16 @@ motion sensing, the two compulsory rules, no audio assumptions.
 **Toolchain (decided):** `arduino-cli` with the `esp32:esp32` core, Arduino-style C++ sketches,
 **NimBLE-Arduino** for BLE. **Not** PlatformIO and **not** the Arduino IDE. Installed per-user,
 no administrator rights: binary in `%LOCALAPPDATA%\ArduinoCLI`, packages and libraries under
-`%USERPROFILE%\.arduino15` and `%USERPROFILE%\Documents\Arduino\libraries`. The install was
+`%LOCALAPPDATA%\Arduino15` (Windows keeps the data dir there, **not** in `~\.arduino15`) and
+`%USERPROFILE%\Documents\Arduino\libraries`. The install was
 started in the background at 13:47 because the core download is the long pole — it runs while
 we wire the breadboard.
-- Commit `arduino-cli.yaml` (board manager URLs, sketch/build paths) and the exact
-  `arduino-cli compile --fqbn esp32:esp32:esp32s3 … ` / `upload` commands in `firmware/README.md`
-  so anyone can rebuild without guessing.
+- **Done in `firmware/README.md`:** the exact
+  `arduino-cli compile --fqbn esp32:esp32:esp32s3:FlashMode=dio,FlashSize=16M,PSRAM=disabled,CDCOnBoot=default`
+  / `upload -p COM4` commands, the library list and the serial-capture workaround, so anyone can
+  rebuild without guessing. No `arduino-cli.yaml` is committed on purpose: `config dump` shows
+  the defaults (`additional_urls: []`) and the ESP32 core needs no third-party board URL, so a
+  committed config file would be noise pretending to be a requirement.
 - Proof of the toolchain itself: `arduino-cli version`, `core list` showing `esp32:esp32`,
   `lib list` showing NimBLE-Arduino, and a trivial sketch compiling for the S3 target.
 
@@ -140,7 +148,13 @@ we wire the breadboard.
   QFN56 rev v0.2. The on-board RGB LED answers on **GPIO 48**, GPIO 38 stayed dark.
   All of it is written up in `HARDWARE.md`, with the pin in `firmware/config.h`.
   Full evidence in the verification log below. **Not** done in this step: the tap and
-  rotate-in-hand checks (nobody watched them) and `docs/wiring.jpg`.
+  rotate-in-hand checks (nobody watched them).
+  The wiring photo is **done** — `docs/wiring.jpg` is in the repo (commit `6d11b52`, 14:47),
+  840x1493 JPEG at 93 KB with the EXIF GPS block stripped, referenced by the README and
+  rendering on GitHub. The build commands this step promised are **done** too:
+  [`firmware/README.md`](firmware/README.md). Still open from this step: the silkscreen labels
+  next to GPIO 8/9 and the LED, and the wire colours in `HARDWARE.md` (readable off the photo
+  whenever someone has two minutes).
 
 ### Step 4 — data recorder
 - Record labelled sessions from the PC-linked board over USB (allowed for data collection —
