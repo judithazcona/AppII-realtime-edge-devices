@@ -103,9 +103,19 @@ static void startBle() {
                                          NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY,
                                          BLE_STATE_MAX_LEN);
   svc->start();
+  // What a scanner actually sees. The 128-bit service UUID takes 19 of the 31 advertising bytes,
+  // so the 15-byte name does NOT fit in the same packet: the name goes in the SCAN RESPONSE and
+  // the scan response must be enabled explicitly, or a scanner that only reads the ADV_IND
+  // (some apps do) sees an unnamed device. Both are set here on purpose - this is the whole
+  // reason the board was invisible in NB Devices.
   NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
-  adv->addServiceUUID(BLE_SERVICE_UUID);  // so the monitor page can filter on it
-  adv->start();
+  adv->enableScanResponse(true);
+  adv->setName(BLE_DEVICE_NAME);            // "AppII-Monitor", in the packet, not just internally
+  adv->addServiceUUID(BLE_SERVICE_UUID);    // 53bc7f1a-...-11be1aba66a3, so the app can filter
+  if (!adv->start()) {                      // a silent failure here means an undiscoverable board
+    for (int i = 0; i < RGB_LED_COUNT; ++i) led.setPixelColor(i, COLOUR_UNKNOWN);
+    led.show();                             // solid white: BLE did not start, LED says so
+  }
 }
 
 // Published value: the class name from the exported header, or empty before the first decision
