@@ -65,6 +65,14 @@ power bank → ESP32-S3 boots on its own → reads MPU-6050 → window → featu
 
 Points count only for what is demonstrated live to the teacher.
 
+## Own extension: knowing when it does not know
+
+Instead of always naming a class, the device **abstains** when it is not sure: below a
+confidence threshold, or when the movement is far from anything it was trained on, it reports
+*unsure*. The number that matters is accuracy against coverage — what fraction of windows it
+answers, how often those are right, and how many of its refusals it would have got wrong. The
+measurements land here with step 10 of [`PLAN.md`](PLAN.md).
+
 ## Repository layout
 
 | Path | Purpose | Status |
@@ -90,8 +98,20 @@ uv add <package>      # install a dependency (updates pyproject.toml + uv.lock)
 uv run <script.py>    # run a script inside the project environment
 ```
 
-**Firmware (board).** _TODO — toolchain, build and flash commands, and the I²C pins, sample
-rate and LED pin once chosen. These are the open questions listed in `PLAN.md`._
+**Firmware (board).** Built with [`arduino-cli`](https://docs.arduino.cc/arduino-cli/) and the
+`esp32:esp32` core, Arduino-style C++, with **NimBLE-Arduino** for BLE and Adafruit NeoPixel for
+the on-board addressable RGB LED. Everything installs into the user folder, no administrator
+rights:
+
+```powershell
+arduino-cli core install esp32:esp32
+arduino-cli lib install "NimBLE-Arduino" "Adafruit NeoPixel"
+arduino-cli compile --fqbn esp32:esp32:esp32s3 firmware/<sketch>
+arduino-cli upload  -p COMx --fqbn esp32:esp32:esp32s3 firmware/<sketch>
+```
+
+_TODO — the exact sketch names, the I²C pins, the LED GPIO and the sample rate go here as the
+steps in `PLAN.md` land; `firmware/README.md` will hold the authoritative commands._
 
 Every script sets its random seeds from one shared constant, so re-running a training script on
 the same recordings reproduces the same metrics.

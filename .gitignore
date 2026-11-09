@@ -60,10 +60,14 @@ dependencies.lock
 partitions/*.bin
 bootloader_signing_key.pem
 .cache/
-.pio/
-.pioenvs
-.piolibdeps
-arduino/local/
+# arduino-cli compile output (keep the sketch + commands, not the artifacts)
+*.elf
+*.map
+*.exe
+firmware/build/
+build/
+sdkconfig.old
+.menuconfig
 
 # --- Logs, notebooks, tooling noise ---
 *.log
