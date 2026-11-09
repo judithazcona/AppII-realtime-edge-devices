@@ -48,7 +48,11 @@ CONFIG_H = REPO_ROOT / "firmware" / "config.h"
 SPLIT_FILE = REPO_ROOT / "training" / "split_assignment.json"
 HEADER_OUT = REPO_ROOT / "firmware" / "model_weights.h"
 
-MIN_SESSIONS_PER_CLASS = 2  # with 1 session there is no held-out session to be honest about
+#: A class is not trainable below this many whole sessions. One is needed for fitting and
+#: the second is the floor before any held-out number means anything; below this the class
+#: is left out of training rather than exported as a head that always says otherwise.
+#: (This replaced MIN_SESSIONS_PER_CLASS, which said the same thing twice.)
+MIN_TRAIN_PER_CLASS = 2
 
 
 # --------------------------------------------------------------- config.h ----
@@ -124,12 +128,28 @@ def discover_sessions() -> dict[str, list[Path]]:
 
 
 # ----------------------------------------------------------------- split -----
-def assign_splits(by_class: dict[str, list[Path]], seed: int) -> dict[str, str]:
+def assign_splits(by_class: dict[str, list[Path]],
+                  seed: int) -> tuple[dict[str, str], list[str], dict[str, int]]:
     """Whole-session train/val/test, seeded, and **committed** so it is stable forever.
+
+    Returns (assignment, trainable_classes, short_by_class).
 
     An existing `training/split_assignment.json` is honoured: a session that already has a
     split keeps it, so growing the dataset later cannot move a session from test to train -
     which would quietly invalidate every number quoted in the README.
+
+    That rule has one exception, and it exists because of a bug this file had. A class with
+    two recorded sessions and the 25 % reservation gave one session to val and one to test,
+    which left **no training data at all** for that class: the four-class run scored 0 %
+    recall on calm and fast breathing and silently fed every one of their windows to
+    `not_attached`. A class cannot be held out before it can be learned, so:
+
+      * test/val are reserved only out of the sessions beyond `MIN_TRAIN_PER_CLASS`;
+      * an existing assignment that leaves a trainable class with no train sessions is
+        repaired by moving its newest held-out session into train - loudly, because a
+        number in the README then refers to a session this run used for fitting;
+      * a class that cannot reach MIN_TRAIN_PER_CLASS is reported as short and left out of
+        training entirely, rather than exported as a head that always says otherwise.
     """
     existing: dict[str, str] = {}
     if SPLIT_FILE.exists():
@@ -137,23 +157,52 @@ def assign_splits(by_class: dict[str, list[Path]], seed: int) -> dict[str, str]:
 
     assignment = dict(existing)
     rng = random.Random(seed)
+    trainable: list[str] = []
+    short: dict[str, int] = {}
+
     for cls, paths in sorted(by_class.items()):
         names = [p.name for p in paths]
         fresh = [n for n in names if n not in existing]
         rng.shuffle(fresh)  # seeded: the same sessions land in the same split every run
         n = len(names)
+        if n < MIN_TRAIN_PER_CLASS:
+            short[cls] = MIN_TRAIN_PER_CLASS - n
+            for name in names:  # recorded and committed, but not usable yet
+                assignment.setdefault(name, "unused")
+            continue
+        trainable.append(cls)
+
         want = {"test": max(1, round(n * 0.25)), "val": max(1, round(n * 0.25))}
+        budget = n - MIN_TRAIN_PER_CLASS  # what may be reserved without starving the fit
+        want = {k: min(v, budget) for k, v in want.items()}
+        want["val"] = min(want["val"], budget - want["test"])
         have = Counter(assignment[n2] for n2 in names if n2 in assignment)
+
+        # Repair first: honouring an old reservation must never starve the fit.
+        deficit = MIN_TRAIN_PER_CLASS - have["train"]
+        held_out = [nm for nm in fresh + sorted(nm for nm in names if nm in existing)
+                    if assignment.get(nm) in ("val", "test", "unused")]
+        for name in held_out:
+            if deficit <= 0:
+                break
+            assignment[name] = "train"
+            deficit -= 1
+            print(f"  note: {name} -> train ({cls} needs {MIN_TRAIN_PER_CLASS} fitting "
+                  f"sessions; any earlier score for {cls} used a different split)")
+
+        have = Counter(assignment[n2] for n2 in names)
         need_test = max(0, want["test"] - have["test"])
         need_val = max(0, want["val"] - have["val"])
         for i, name in enumerate(fresh):
+            if assignment.get(name) == "train":
+                continue
             if i < need_test:
                 assignment[name] = "test"
             elif i < need_test + need_val:
                 assignment[name] = "val"
             else:
                 assignment[name] = "train"
-    return assignment
+    return assignment, trainable, short
 
 
 def save_splits(assignment: dict[str, str], seed: int) -> None:
@@ -220,9 +269,24 @@ def export_header(model, mean: np.ndarray, std: np.ndarray, labels: list[str],
         w2 = np.hstack([-0.5 * w2, 0.5 * w2])
         b2 = np.concatenate([-0.5 * b2, 0.5 * b2])
 
+    def c_float(v: float) -> str:
+        """float32 -> C++ source. Must contain '.' or an exponent.
+
+        Bare `%g` writes 1.0 as `1f`, and the ESP32 toolchain's g++ reads `1f` as a
+        user-defined numeric literal: `error: unable to find numeric literal operator
+        'operator""f'` on every whole-number weight and on the whole log mask. It only
+        appeared once firmware actually included the header.
+        """
+        if not np.isfinite(v):
+            raise ValueError(f"non-finite value in the exported model: {v}")
+        s = f"{v:.7g}"
+        if not ("." in s or "e" in s or "E" in s):
+            s += ".0"
+        return s + "f"
+
     def arr(name: str, a: np.ndarray, per_line: int = 8) -> list[str]:
         flat = np.asarray(a, dtype=np.float32).ravel()
-        vals = ", ".join(f"{v:.7g}f" for v in flat)
+        vals = ", ".join(c_float(v) for v in flat)
         out, chunk = [f"static const float {name}[{flat.size}] = {{", ], vals.split(", ")
         for i in range(0, len(chunk), per_line):
             out.append("    " + ", ".join(chunk[i:i + per_line]) + ("," if i + per_line < len(chunk) else ""))
@@ -330,16 +394,28 @@ def main() -> int:
                              + ", ".join(f"{k}({len(v)})" for k, v in sorted(found.items())))
         labels = wanted
     else:
-        labels = [c for c, v in sorted(found.items()) if len(v) >= MIN_SESSIONS_PER_CLASS]
+        labels = [c for c, v in sorted(found.items()) if len(v) >= MIN_TRAIN_PER_CLASS]
     if len(labels) < 2:
         raise SystemExit("need at least two classes with data to train anything")
     usable = {c: found[c] for c in labels}
-    thin = {c: len(v) for c, v in usable.items() if len(v) < MIN_SESSIONS_PER_CLASS}
-    if thin:
-        raise SystemExit(f"too few sessions for a held-out split: {thin} "
-                         f"(need >= {MIN_SESSIONS_PER_CLASS})")
 
-    assignment = assign_splits(usable, args.seed)
+    # Was: a class with two sessions put one in val and one in test and none in train, so it
+    # was learned by nothing and every one of its windows went to whichever class did have
+    # data. Now the classes that cannot be fit are named and skipped instead.
+    assignment, trainable, short = assign_splits(usable, args.seed)
+    if short:
+        print("NOT TRAINABLE YET - left out of this run, sessions still recorded and listed:")
+        for cls, need in sorted(short.items()):
+            print(f"  {cls:<16} {len(usable[cls])} session(s) -> needs {need} more "  # noqa
+                  f"({MIN_TRAIN_PER_CLASS} for fitting alone, then 1 validation + 1 test)")
+        print()
+    if set(short) & set(wanted if args.classes else []):
+        print(f"note: you asked for {', '.join(sorted(set(short) & set(wanted)))} explicitly; "
+              f"it is still skipped - record the sessions, then re-run.\n")
+    labels = trainable
+    if len(labels) < 2:
+        raise SystemExit(f"fewer than two classes are trainable; short: {short}")
+    usable = {c: found[c] for c in labels}
     save_splits(assignment, args.seed)
 
     print(f"rate {rate:.0f} Hz from config.h   window {cfg['WINDOW_SAMPLES']} samples "

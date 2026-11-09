@@ -17,9 +17,9 @@
 static const char *const MODEL_CLASS_NAMES[2] = {"not_attached", "shaking"};
 
 static const float MODEL_LOG_MASK[24] = {
-    1f, 1f, 1f, 0f, 1f, 1f, 1f, 0f,
-    1f, 1f, 1f, 0f, 1f, 1f, 1f, 1f,
-    1f, 1f, 1f, 1f, 1f, 1f, 1f, 1f
+    1.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+    1.0f, 1.0f, 1.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+    1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f
 };
 
 static const float MODEL_FEAT_MEAN[24] = {
