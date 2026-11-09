@@ -1,7 +1,7 @@
 # PLAN
 
 Real-time AI on a microcontroller — ESP32-S3 N16R8 + MPU-6050 (GY-521).
-Status: **2026-11-09, 15:05** — mid-lab. The lab runs **13:00–17:00**. Rules in
+Status: **2026-11-09, 15:25** — mid-lab, **~65 min behind the 13:50 plan** (re-cut below). The lab runs **13:00–17:00**. Rules in
 [`AGENTS.md`](AGENTS.md).
 
 ## COMPULSORY — either one missed = 0 points for the whole project
@@ -20,12 +20,14 @@ Status: **2026-11-09, 15:05** — mid-lab. The lab runs **13:00–17:00**. Rules
    invitations one.
 
 2. **At least 3 intermediate commits during the lab, each pushed to GitHub as we go.**
-   Current status: ✅ **minimum met with room to spare — 6 commits pushed and verified**
-   (`2465333` 13:20, `9f71414` 13:43, `bec06c2` 14:06, `bb53ade` 14:33, `6d11b52` 14:47, and this
-   one at 15:01). The minimum was already met at 14:06, i.e. nearly three hours before the deadline.
-   Keeping the pace anyway: the plan has 7
-   more steps, one commit each, and the rule says "as we go", so no step is ever parked
-   uncommitted. This file's COMMIT TRACKER is the evidence.
+   Current status: ✅ **minimum met with room to spare — 7 commits pushed and verified**
+   (`2465333` 13:20, `9f71414` 13:43, `bec06c2` 14:06, `bb53ade` 14:33, `6d11b52` 14:47,
+   `10374fc` 15:01, and this one ~15:25). The minimum was already met at 14:06, i.e. nearly
+   three hours before the deadline.
+   Keeping the pace anyway: the plan has 6 more steps, one commit each, and the rule says
+   "as we go", so no step is ever parked uncommitted. This file's COMMIT TRACKER is the
+   evidence. **The schedule has slipped ~65 min (see Time plan), so this rule is the one thing
+   that must not slip: even if a graded feature gets cut, its commit still happens.**
 
 ## Lab clock
 
@@ -34,8 +36,8 @@ Status: **2026-11-09, 15:05** — mid-lab. The lab runs **13:00–17:00**. Rules
 | Lab start | **13:00** (confirmed) |
 | Lab length | 4 hours |
 | Lab end | **17:00** |
-| Now | 15:05 → **1 h 55 min of lab time left** |
-| **Commits pushed since lab start** | **6** counting this one (5 were already on GitHub: `2465333` `9f71414` `bec06c2` `bb53ade` `6d11b52`) — `git rev-list --count origin/judithbranch --since='2026-11-09T13:00:00+01:00'`, re-run after every push |
+| Now | 15:25 → **1 h 35 min of lab time left** |
+| **Commits pushed since lab start** | **7** counting this one (6 already on GitHub: `2465333` `9f71414` `bec06c2` `bb53ade` `6d11b52` `10374fc`) — `git rev-list --count origin/judithbranch --since='2026-11-09T13:00:00+01:00'`, re-run after every push |
 
 > Print that count every time this tracker is updated (rule 9); it is the evidence for
 > compulsory rule 2. The minimum is 3, so the count must read **3 or more well before 16:30**,
@@ -54,8 +56,8 @@ step is run and shown immediately after that step's push.
 | 2b | Toolchain, lab clock, LED and extension decided | `bec06c2` | 2026-11-09 14:06:39 +01:00 | yes — `ls-remote` + `gh api` both showed `bec06c2ee8…` |
 | 3 | Wiring and sensor check: `HARDWARE.md`, `config.h`, `bench_test`, `led_test` | `bb53ade` | 2026-11-09 14:33:57 +01:00 | yes — `ls-remote` + `gh api` both showed `bb53ade`, proof run right after the push |
 | 3b | Wiring photo: `docs/wiring.jpg` compressed to 93 KB, EXIF/GPS stripped | `6d11b52` | 2026-11-09 14:47:49 +01:00 | yes — `ls-remote` = local HEAD, `gh api` newest = `6d11b52`, and the rendered README contains `<img src="docs/wiring.jpg">` |
-| 3c | `firmware/README.md` with the exact arduino-cli commands; close the step-3 leftovers in this plan | this commit (hash recorded in the next row) | recorded in the next row | yes — proof run right after this push |
-| 4 | Data recorder (labelled sessions, CSV off-repo) | — | — | no |
+| 3c | `firmware/README.md` with the exact arduino-cli commands; close the step-3 leftovers in this plan | `10374fc` | 2026-11-09 15:01:19 +01:00 | yes — `ls-remote` = local HEAD, `gh api` newest = `10374fc`, 6 commits since 13:00 |
+| 4 | Data recorder: `firmware/data_recorder`, `training/record.py`, `training/config.py`, `data/README.md`, pyproject + uv.lock | this commit (hash recorded in the next row) | recorded in the next row | yes — proof run right after this push |
 | 5 | Trained model and honest evaluation | — | — | no |
 | 6 | Firmware on the board: movement vs shaking | — | — | no |
 | 7 | Breathing: four states on the LED | — | — | no |
@@ -157,8 +159,29 @@ we wire the breadboard.
   whenever someone has two minutes).
 
 ### Step 4 — data recorder
+**Result, 15:20 — the recorder works; the real sessions are being recorded right now.**
+`firmware/data_recorder` streams accel + gyro as CSV rows at a fixed 100 Hz, timestamped by
+the board's own `micros()` (a PC-side timestamp would carry OS scheduling jitter and show up
+later as fake frequency content). `training/record.py` (run with `uv`) asks for class, session
+name, person and placement, counts 3-2-1-GO, and writes one CSV into `data/raw/`, with the
+firmware's own header (rate, ranges, scales, column order) copied into the file, plus the
+*measured* rate, median inter-sample interval and gap count computed from the timestamps —
+because the rate we ask for and the rate the board delivers are different claims and only one
+can be checked. `data/README.md` carries the format, the naming scheme, the per-class
+protocol and the re-record commands.
+
+Measured, not asserted: **100.00 Hz delivered** (1200 samples in 11.99 s; a second take 297 in
+2.96 s), median dt **10.00 ms**, p99 **10.01 ms**, **0 gaps**, board at rest `az` 0.96–1.00 g.
+Compile 302,681 bytes (23 % of the app partition), 23,048 B RAM. Two smoke-test files exist in
+`data/raw/` and `record.py --list` marks them `usable: no` so they cannot leak into training.
+`git status` shows no CSV; `git check-ignore -v` matches `.gitignore:27:data/raw/`.
+The two things that only show up when you run it: the firmware printed its header once at
+boot, so a recorder connecting later never learned the rate (fixed: `H` re-sends it), and
+`--probe` used to demand a class label it does not need.
+
 - Record labelled sessions from the PC-linked board over USB (allowed for data collection —
-  the no-USB-data rule applies to the demo).
+  the no-USB-data rule applies to the demo; rule 7 now names `bench_test` and
+  `data_recorder` as the only two serial sketches).
 - One file per session, `sessionNNN_<class>.csv`, header with sample rate, ranges, person,
   placement; ≥3 varied sessions per class; "not attached" includes the board lying still.
 - Stage 1 records slow movement + shaking + not-attached (enough for the first demo); stage 2
@@ -256,45 +279,44 @@ input is far from anything it was trained on, it reports *unsure* rather than a 
 
 ## Time plan for the rest of the lab
 
-**190 minutes left** (13:50 → 17:00). Clock times, not aspirations. The movement-vs-shaking
-demo is deliberately ready at **15:20, before the halfway-ish point**, because it proves the
-whole chain — wiring, data, training, on-chip inference, LED — and everything after that is
-adding classes and surfaces to a chain we already know works.
+**95 minutes left** (15:25 → 17:00), and **the schedule is ~65 minutes behind the plan written
+at 13:50**. Where it went: the ESP32 core download (12 min, unavoidable, run in parallel),
+turning the assumed board settings into measurements (`esptool flash_id`, LED pin hunt on
+GPIO 48 vs 38), and writing the recorder so it *measures* its own sample rate instead of
+claiming one. All of that is bought once and spent every hour from now — the board, the pins
+and the 100.00 Hz stream are known-good — but the slip is real and the plan below is re-cut to
+fit 95 minutes, not the one that assumed 190.
 
 | Block | clock | min | work | banked points |
 | --- | --- | --- | --- | --- |
-| A | 13:20–13:50 | *(done)* | commits 1, 2 and 2b: rules, plan, toolchain decision | — |
-| — | 13:47→ | *(parallel)* | **arduino-cli + esp32 core + NimBLE installing in the background** | — |
-| B | 13:50–14:10 | 20 | wiring, I²C scan, live accel/gyro, **all four LED colours** → commit 3 | — |
-| C1 | 14:10–14:25 | 15 | record stage-1 sessions (slow movement, shaking, not-attached) **+ 2–3 never-trained-on movements** → commit 4 | — |
-| D1 | 14:25–14:45 | 20 | features + 2-class model + held-out metrics → commit 5 | — |
-| **E** | **14:45–15:20** | 35 | **firmware: movement vs shaking on the board → commit 6 — DEMO GATE** | **2.5** |
-| C2 | 15:20–15:35 | 15 | record chest sessions: calm + fast breathing, more not-attached | — |
-| F | 15:35–16:05 | 30 | four-state model + firmware + LED → commit 7 | **5.0** |
-| G | 16:05–16:25 | 20 | BLE characteristic + Pages monitor → commit 8 | **6.5** |
-| H | 16:25–16:40 | 15 | board's Wi-Fi hotspot page → commit 9 | **7.5** |
-| I | 16:40–16:52 | 12 | abstention extension + README finished → commit 10 | **9.0** |
-| J | 16:52–17:00 | 8 | freeze, commit 11, compliance re-check, run the demo script once | **10.0** |
+| A, B, 3b, 3c | 13:20–15:05 | *(done)* | commits 1, 2, 2b, 3, 3b, 3c: rules, plan, toolchain, wiring, LED pin, photo, build commands | — |
+| **C1** | **15:20–15:38** | 18 | **team records stage-1 + novel sessions now** (4 × `not_attached`, 4 × `shaking`, 3 × `novel_*`), all three people | — |
+| — | 15:20→15:38 | *(parallel)* | **the training script is written while the data is recorded** (features → 2-class model → C header); track 3 creates the **second public Pages repo** and starts the monitor page against the agreed characteristic UUID | — |
+| D1 | 15:38–15:58 | 20 | features + model + held-out **session** metrics + weights exported into a generated C header → commit 5 | — |
+| **E** | **15:58–16:22** | 24 | **firmware: movement vs shaking on the LED, from a power bank → commit 6 — DEMO GATE, was 15:20** | **2.5** |
+| C2 | 16:22–16:32 | 10 | record chest sessions: 2 calm + 2 fast, different people and rhythms | — |
+| F | 16:32–16:50 | 18 | retrain with 4 classes, four colours on the LED → commit 7 | **5.0** |
+| G | 16:50–16:58 | 8 | BLE notify — **cheap only if track 3 built the page in parallel and the characteristic was added back in block E** | 6.5 |
+| I | 16:50–17:00 | 10 | README + PLAN closed, compliance re-check → commits 10 and 11 | **6.0** |
 
-**Reality check, said honestly:** blocks G, H and I are 47 minutes for 4 points, which is
-optimistic for BLE-plus-two-web-surfaces. That is why they come last, why their prerequisites
-are pulled forward, and because we defend the 5 points banked at **16:05** rather than ending
-with six half-working things and no commits.
+**What is honest about this table:** blocks **H (board web page, 1 pt)** and most of **I
+(abstention extension, 1.5 pt)** do not fit in 95 minutes alongside the 5 points of motion and
+breathing. Realistic target is **5–6 of 10**, and the way to get nearest 10 is parallelism,
+not speed: the monitor page and the second repository cost nothing on the critical path if
+someone builds them at 15:20–16:20 against a characteristic UUID we fix now
+(`8f6a0001-…`, state = one byte, probabilities = four `uint8` percentages — pinned in
+`PLAN.md` step 8 when the firmware lands).
 
-Three people, three tracks, so the serial path stays free:
-- **Track 1 — firmware:** B, E, F, H.
-- **Track 2 — data and model:** C1, D1, C2, the retraining in F, the abstention threshold in I.
-  Pushes commits 4 and 5 as soon as each works, without waiting for anyone.
-- **Track 3 — pages and docs:** by **14:45** create the second public Pages repository and
-  confirm the board is visible over BLE in nRF Connect, because a Bluetooth surprise found at
-  16:00 kills the whole 1.5 points; then take the wiring photo in B and draft the README
-  alongside D1/F so block I is only a finish, not a write-up.
+**Decision point moved from 16:05 to 16:22 (the demo gate).** At 16:22, if movement-vs-shaking
+is live on a power bank, the 2.5 is banked and breathing (2.5) is the next spend. If it is
+*not* live, stop feature work, keep the 2-class model, and spend the remaining time on the
+cheap partial credit — README (1) plus the BLE characteristic that was already written — rather
+than watching a four-class attempt fail at 16:55 with nothing on the LED.
 
-**Decision point, 16:05.** If the four states are not live on the LED by then, drop block H
-(board web page, 1 point) and spend its 15 minutes on F; keep G in reduced form (state + one
-alarm + connection-lost alarm) rather than skipping it, since the Pages page is also the link
-the README must show. Never cut commits or the README — one is compulsory and the other is a
-graded part we can bank almost for free.
+**Never cut:** commits (compulsory rule 2 — even a cut feature gets its commit), the README
+(1 point and the only thing the teacher opens first), and re-checking that `tomasvicar` is in
+the collaborator list (compulsory rule 1, still pending — ask him in person **now**, it is not
+something to discover at 16:55).
 
 Cut order if we fall behind: board web page (1) → shrink the extension to margin-only (1.5) →
 simplify the BLE alarms but keep the page (1.5). The 5 points in E and F are protected.
@@ -345,7 +367,12 @@ nRF Connect and explain the Web Bluetooth secure-context requirement.
 | Flash size / PSRAM / chip | `esptool --chip esp32s3 -p COM4 flash_id` | **16 MB flash detected**, **8 MB embedded PSRAM**, ESP32-S3 QFN56 rev v0.2 → the `16M` build setting is measured, not assumed |
 | RGB LED data pin | `firmware/led_test` (compiled with **no** `Serial` at all), observed by Judith | **GPIO 48** shows red/green/blue/magenta; **GPIO 38 dark** → `RGB_LED_PIN 48` in `config.h` |
 | Firmware really on the chip | `arduino-cli upload` output | `Hash of data verified` on every flash of `bench_test` and `led_test` |
-| (steps 4–11 to be filled as they run) | | |
+| Commit 3c reached GitHub | `git ls-remote origin` + `gh api .../commits?sha=judithbranch` | both `10374fc…`, committed 15:01:19 +01:00; `git rev-list --count … --since=13:00` → **6** |
+| Wiring photo renders on GitHub | README rendered with the GitHub HTML accept header; raw URL fetched | an `<img src=docs/wiring.jpg …>` tag is in the rendered README; the raw URL returns `200`, `image/jpeg`, `Content-Length: 95701` |
+| Recorder sketch compiles and flashes | `arduino-cli compile` / `upload` with the section-3 FQBN | **302,681 bytes (23 %)**, 23,048 B RAM, `Hash of data verified` |
+| **The recorder delivers the sample rate it claims** | `uv run python training/record.py --probe`, then a 12 s take; rate computed from the **board's own `t_us`**, not the PC clock | **100.00 Hz** (297 samples / 2.96 s; 1200 / 11.99 s), median dt **10.00 ms**, p99 **10.01–10.03 ms**, **0 gaps**, `az` 0.96–1.00 g at rest |
+| Raw CSVs cannot reach the public repo | `git status --short` after two recordings; `git check-ignore -v <file>` | status lists only code and docs; the file is matched by **`.gitignore:27: data/raw/`** |
+| (steps 5–11 to be filled as they run) | | |
 
 ## Decided by Judith (13:45)
 
@@ -357,6 +384,19 @@ nRF Connect and explain the Web Bluetooth secure-context requirement.
   movement) — which is why step 4 also records never-trained-on movements.
 
 ## Open questions — MPU-6050 setup (settle these during step 3, before recording)
+
+**Answered on the bench, 14:35–15:20 — no question below blocks recording any more.**
+| # | answer | how it was checked |
+| --- | --- | --- |
+| 1 | SDA **GPIO 8**, SCL **GPIO 9**; no clash with UART0 (43/44) or the LED (48); bus and LED both work. **Still open: the silkscreen labels**, and the wire colours in `HARDWARE.md` | `bench_test` I²C scan + `led_test` on the same board |
+| 2 | AD0 floating → **`0x68`**; the scan found **exactly one** device on the bus | `bench_test` scan 0x08–0x77 |
+| 4 | **GPIO 48** drives the on-board LED; GPIO 38 dark | `led_test`, no Serial, observed by Judith |
+| 6 | **±8 g** (4096 LSB/g) and **±500 °/s** (65.5 LSB/(°/s)) — shaking cannot clip at ±8 g and ±500 °/s still resolves slow breathing rotation | `config.h`, `bench_test` stream |
+| 7 | **100 Hz**, DLPF **44 Hz**. One setting covers both ends (breathing 0.1–1 Hz, shaking >4 Hz), it matches `WINDOW_SAMPLES 250` = 2.5 s, and the **delivered** rate was measured at 100.00 Hz rather than trusted | `data_recorder` + `record.py --probe` / `--list` |
+| 8 | **genuine MPU-6050**, `WHO_AM_I` = `0x68` — not a clone, so the init sequence needs no clone workaround | `bench_test` |
+| 9 | **COM4**, WCH **CH9102** bridge on UART0, Windows driver already bound → **no install, no admin rights**; therefore `CDCOnBoot=default` (disabled) | `arduino-cli board list`, `Get-PnpDevice` |
+| 10 | **open — this is the job at 15:20–15:38.** 4 sessions/class at 45 s is ~6 min of recording per class-pair, so yes with all three recording in shifts; 3-person coverage is a `--person` field the recorder now insists on writing down | `record.py` |
+| 3, 5 | 3: not measured with a meter, but the module and the LED both run off 3V3 and nothing browned out — VCC is **not** on 5 V. 5: no button wired; labelling is done by the PC prompt, so BOOT is free | observation while wiring; nothing else drew current on 3V3 |
 
 **Board and wiring**
 1. Which GPIOs do we use for SDA/SCL, and does the silkscreen match the N16R8 pinout we will

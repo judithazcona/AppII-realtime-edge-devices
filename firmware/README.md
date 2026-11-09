@@ -149,13 +149,39 @@ $p.Close()
 | --- | --- | --- | --- |
 | [`bench_test/`](bench_test/bench_test.ino) | **yes — the only sketch allowed to** (rule 7) | I²C scan, `WHO_AM_I`, 10 s accel/gyro table | one device at `0x68`; `WHO_AM_I` = `0x68` (genuine MPU-6050); 909 good reads / 0 failed at 100 Hz; gravity 0.98–0.99 g at rest |
 | [`led_test/`](led_test/led_test.ino) | **no** | drives red, green, blue, magenta on GPIO 48, then tries GPIO 38, forever, on power alone | the on-board LED lit on **GPIO 48**; GPIO 38 stayed dark — observed by Judith at 14:35 |
+| [`data_recorder/`](data_recorder/data_recorder.ino) | **yes — the second and last exception** (rule 7) | streams accel + gyro at a fixed 100 Hz as CSV rows for the dataset | **100.00 Hz delivered** (1200 samples in 11.99 s), median dt 10.00 ms, p99 10.01 ms, **0 gaps** |
 | [`config.h`](config.h) | — | pins, I²C address, full-scale ranges, sample rate, window size | shared by every sketch; paired with `HARDWARE.md` |
 
 `led_test` is deliberately written with **zero** `Serial` calls: it is the standing check that
 this firmware family reaches its working state from a power bank with no host attached
 (rule 11).
 
-## 8. Rebuild from scratch on a clean machine
+## 8. Recording dataset sessions (cable attached on purpose)
+
+```powershell
+& $CLI compile --fqbn $FQBN firmware/data_recorder   # 302681 bytes (23%), 23048 bytes RAM
+& $CLI upload  -p COM4 --fqbn $FQBN firmware/data_recorder
+
+uv run python training/record.py --probe             # 3 s, writes nothing, prints the real Hz
+uv run python training/record.py                     # asks for label + name, counts down, records
+uv run python training/record.py --list              # what we have, and what still counts
+```
+
+Close the Arduino monitor first — Windows will not open `COM4` twice, and `record.py` says so
+out loud instead of timing out.
+
+The recorder answers two one-letter commands so the PC can drive a session without resetting
+the board: **`H`** re-sends its header (rate, ranges, scales, column order — printed once at
+boot, which a recorder connecting later would otherwise never see) and **`B`** zeroes `t_us`
+and the counters so a CSV starts at zero. Sample timestamps come from the board's own
+`micros()`, never from the PC clock.
+
+This is a **data-collection tool**, the second and last exception to rule 7. The graded
+firmware must still run from a power bank with no data crossing the cable (rule 11). The CSV
+format, the per-class recording protocol and the re-record procedure are in
+[`../data/README.md`](../data/README.md); recordings stay in `data/raw/`, which is gitignored.
+
+## 9. Rebuild from scratch on a clean machine
 
 1. Install `arduino-cli` into `%LOCALAPPDATA%\ArduinoCLI` (no admin).
 2. Sections 1–2 above (core 3.3.12, both libraries, confirm the COM port).

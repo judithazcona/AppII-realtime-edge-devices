@@ -59,8 +59,14 @@ no microphone: motion sensors only.
    machine — that is part of the graded documentation.
 7. **USB logging is a development tool.** Serial output is fine while building, but it must sit
    behind a compile-time switch, and the demo build must not need it (constraint 11 below).
-   Right now `firmware/bench_test` is the **only** sketch allowed to use `Serial`; every other
-   sketch — including `firmware/led_test` — must work with no host attached at all.
+   The switch here is **a separate sketch per purpose**, which is stronger than an `#ifdef`:
+   exactly two sketches use `Serial`, and neither is the demo —
+   - `firmware/bench_test` — bring-up, sensor sanity.
+   - `firmware/data_recorder` — **labelled dataset collection** (approved by Judith: the PC is
+     deliberately attached while recording; the no-data-over-USB rule applies to the demo).
+
+   Every other sketch — `led_test` and all of steps 6–11 — must work with no host attached at
+   all.
 
 ## Reproducibility
 

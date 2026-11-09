@@ -84,22 +84,30 @@ measurements land here with step 10 of [`PLAN.md`](PLAN.md).
 | `PLAN.md` | States, grading, hard constraints, commit tracker, time plan, demo script, open questions | done |
 | [`HARDWARE.md`](HARDWARE.md) | **The truth about the wiring**: pin table, USB bridge, board build settings, what is measured vs assumed — kept in step with `firmware/config.h` | done |
 | `docs/` | Wiring photo (`docs/wiring.jpg`), figures and notes for the write-up | photo in |
-| `firmware/` | ESP32-S3 firmware: sensor, features, model, LED, BLE, web server. `config.h` holds the pins; `bench_test` and `led_test` are the bring-up checks | bring-up running |
-| `training/` | Data loading, features, training and evaluation scripts | planned |
-| `data/` | Only `data/README.md` — raw recordings stay off the repo (rule 16) | planned |
+| `firmware/` | ESP32-S3 firmware: sensor, features, model, LED, BLE, web server. [`config.h`](firmware/config.h) holds the pins; `bench_test`, `led_test` and `data_recorder` are the bring-up and collection sketches; [`firmware/README.md`](firmware/README.md) the exact build commands | bring-up + recorder running |
+| `training/` | `config.py` (the shared `SEED`, classes, paths), `record.py` (labelled recording), then data loading, features, training and evaluation | recorder running, rest planned |
+| [`data/README.md`](data/README.md) | **CSV format, session naming, recording protocol and how to re-record** — the raw recordings themselves stay off the repo (rule 16) | done, data being recorded |
 
 The raw IMU recordings, extracted windows and model binaries are deliberately **not** in this
-repository: it is public, and they are large. `data/README.md` will describe the CSV format and
-how to re-record.
+repository: it is public, and they are large. [`data/README.md`](data/README.md) describes the
+CSV format, the session naming and how to re-record a dataset from scratch.
 
 ## How to run
 
-**Training (PC).** Python runs through [uv](https://docs.astral.sh/uv/), so there is no manual
-virtualenv:
+**Training and recording (PC).** Python runs through [uv](https://docs.astral.sh/uv/), so there
+is no manual virtualenv:
 
 ```bash
 uv add <package>      # install a dependency (updates pyproject.toml + uv.lock)
 uv run <script.py>    # run a script inside the project environment
+```
+
+Recording a labelled dataset from the board (the board first runs `firmware/data_recorder`):
+
+```bash
+uv run python training/record.py --probe    # 3 s, writes nothing, prints the measured Hz
+uv run python training/record.py            # asks for class + session name, counts down, records
+uv run python training/record.py --list     # what we have, and which takes still count
 ```
 
 **Firmware (board).** Built with [`arduino-cli`](https://docs.arduino.cc/arduino-cli/) and the
