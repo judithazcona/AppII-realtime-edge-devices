@@ -4,7 +4,9 @@ This file is the authority on how the device is wired. It is updated **together 
 [`firmware/config.h`](firmware/config.h)**: a pin that appears in one and not the other is a bug.
 
 Wiring as built by hand on the breadboard, 2026-11-09 ~14:15. Photo:
-[`docs/wiring.jpg`](docs/wiring.jpg) *(to be added)*.
+[`docs/wiring.jpg`](docs/wiring.jpg) — 840x1493 JPEG, 93 KB, EXIF stripped so the public repo
+publishes no GPS coordinates; the full-resolution original sits at `docs/raw/`, which is
+gitignored.
 
 ## GY-521 (MPU-6050) → ESP32-S3 N16R8
 

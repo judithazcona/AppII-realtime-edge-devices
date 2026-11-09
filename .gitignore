@@ -49,6 +49,9 @@ data/external/
 docs/*.html
 docs/**/*.html
 
+# --- Full-resolution originals stay out; only the compressed photo is committed ---
+docs/raw/
+
 # --- Firmware build output ---
 build/
 .cxx/
