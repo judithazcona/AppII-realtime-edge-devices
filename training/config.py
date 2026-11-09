@@ -66,10 +66,23 @@ CLASSES: dict[str, tuple[str, str, int]] = {
     "fast_breathing": ("red", "board on the chest, fast breathing", 2),
 }
 
-# Stage 1 (the first graded demo) needs only these two. record.py refuses the others
-# until step 7, so nobody records a chest session by accident and calls it stage 1 data.
+# Stage 1 (the first graded demo) needs only these two; the chest pair arrives with step 7.
 STAGE1_CLASSES: tuple[str, ...] = tuple(n for n, v in CLASSES.items() if v[2] == 1)
+CHEST_CLASSES: tuple[str, ...] = tuple(n for n, v in CLASSES.items() if v[2] == 2)
 
 # Sessions we never train on — the held-out material for the abstention extension
 # (PLAN.md step 10). Recorded now because they cannot be invented afterwards.
 NOVEL_CLASSES: tuple[str, ...] = ("novel_tapping", "novel_rolling", "novel_walking")
+
+# Everything the recorder will accept. The chest classes opened once stage-1 data was in
+# the bag, so that a mis-recorded class could not contaminate the first demo.
+RECORDABLE_CLASSES: tuple[str, ...] = tuple(CLASSES) + NOVEL_CLASSES
+
+# What to say on the console for the chest classes, where the wiring of the *subject*
+# matters more than the wiring of the board.
+CHEST_HINTS: dict[str, str] = {
+    "calm_breathing": "hold/tape the board flat against the chest, breathe slowly and "
+                      "regularly through the nose, don't talk or cough",
+    "fast_breathing": "same placement, breathe fast and shallow on purpose, keep the "
+                      "board from sliding",
+}

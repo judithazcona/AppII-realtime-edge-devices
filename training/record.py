@@ -34,6 +34,8 @@ from datetime import datetime
 from pathlib import Path
 
 from config import (
+    CHEST_CLASSES,
+    CHEST_HINTS,
     CLASSES,
     DEFAULT_BAUD,
     DEFAULT_PORT,
@@ -41,7 +43,7 @@ from config import (
     NOVEL_CLASSES,
     RATE_TOLERANCE_HZ,
     RAW_DIR,
-    STAGE1_CLASSES,
+    RECORDABLE_CLASSES,
     TARGET_SESSION_SECONDS,
     SEED,
     seed_everything,
@@ -287,9 +289,9 @@ def main() -> int:
     ap.add_argument(
         "--class",
         dest="cls",
-        choices=sorted(STAGE1_CLASSES + NOVEL_CLASSES),
-        help="the two stage-1 classes, or a never-trained-on 'novel_*' one for the "
-             "abstention extension",
+        choices=sorted(RECORDABLE_CLASSES),
+        help="not_attached, shaking, calm_breathing, fast_breathing, or a never-trained-on "
+             "novel_* class for the abstention extension",
     )
     ap.add_argument("--session", help="short name for the condition, e.g. table_still")
     ap.add_argument("--person", default="", help="who performed the motion")
@@ -309,17 +311,17 @@ def main() -> int:
     if args.probe:
         return probe(args)
 
-    allowed = tuple(sorted(STAGE1_CLASSES + NOVEL_CLASSES))
+    allowed = tuple(sorted(RECORDABLE_CLASSES))
     cls = args.cls or ask("class to record", choices=allowed)
     if cls not in allowed:
-        raise SystemExit(
-            "stage 1 records " + ", ".join(STAGE1_CLASSES) + " plus the held-out "
-            + ", ".join(NOVEL_CLASSES) + "; the chest classes come with step 7"
-        )
+        raise SystemExit("unknown class '" + str(cls) + "'. Known: " + ", ".join(allowed))
     novel = cls in NOVEL_CLASSES
     session = args.session or ask("session name (short, describes the take)", default="take_1")
     person = args.person if args.session else ask("person", default="judith")
-    placement = args.placement if args.session else ask("placement", default="")
+    chest = cls in CHEST_CLASSES
+    placement = args.placement if args.session else ask(
+        "placement", default="taped flat against the chest" if chest else ""
+    )
 
     duration = args.duration
     if duration < MIN_SESSION_SECONDS:
@@ -333,6 +335,8 @@ def main() -> int:
     print(f"\nclass     {cls}  (LED {colour}) - {meaning}")
     print(f"session   {session}")
     print(f"duration  {duration:.0f} s\n")
+    if chest:
+        print("CHEST TAKE - " + CHEST_HINTS[cls] + "\n")
     print("3")
     for n in ("2", "1"):
         time.sleep(1.0)
