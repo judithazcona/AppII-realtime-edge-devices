@@ -18,14 +18,23 @@
 #include <math.h>
 #include <string.h>
 
-#define IMU_FEATURES 24
+#define IMU_FEATURES 26
 #define IMU_SIG_COLS 6  // ax_g, ay_g, az_g, gx_dps, gy_dps, gz_dps
+
+// Breathing band, 0.15-0.90 Hz of the demeaned acceleration magnitude. Five frequencies are
+// evaluated directly (O(5N), no transform buffer) because a 2.5 s window only resolves 0.4 Hz
+// apart - an FFT of this window cannot tell 0.2 Hz from 0.8 Hz. Matches features.BAND_FREQS
+// and features.BAND_RATE_HZ (= MPU_SAMPLE_RATE_HZ); change one, change the other.
+#define IMU_BAND_RATE_HZ 100
+#define IMU_BAND_N 5
+static const float IMU_BAND_FREQS[IMU_BAND_N] = {0.15f, 0.30f, 0.50f, 0.70f, 0.90f};
 
 // Order of the feature vector. Must equal features.FEATURE_NAMES:
 //   ax_std ax_mad ax_jerk ax_zcr  ay_...  az_...
 //   mag_mean mag_std mag_max mag_min
 //   gx_std gx_jerk  gy_std gy_jerk  gz_std gz_jerk
 //   gmag_mean gmag_max
+//   bb_energy bb_ratio
 #define FEAT_AX_STD 0  // + 4 per axis
 
 // log1p mask, written out as a table instead of derived from indices: an earlier version
@@ -41,6 +50,7 @@ static const uint8_t IMU_FEAT_LOG[IMU_FEATURES] = {
     /* gy std, jerk */ 1, 1,
     /* gz std, jerk */ 1, 1,
     /* gmag_mean, gmag_max */ 1, 1,
+    /* bb_energy, bb_ratio */ 1, 1,
 };
 
 static inline bool imu_feat_is_log(int i) { return IMU_FEAT_LOG[i] != 0; }
@@ -127,6 +137,33 @@ static inline void imu_features(const float *win, int n, float *out) {
     }
     out[k++] = mean / (float)n;
     out[k++] = mx;
+  }
+
+  // bb_energy / bb_ratio - the same five DFT evaluations as features._band_amplitudes: the
+  // demeaned magnitude projected on cos/sin at each band frequency, amplitude 2|X|/N, averaged
+  // over the five, then that band relative to mag_std (out[13]) so a hard shake cannot win the
+  // band feature on absolute amplitude alone.
+  {
+    float mean = 0.0f;
+    for (int i = 0; i < n; ++i) mean += a_mag[i];
+    mean /= (float)n;
+    float band_sum = 0.0f;
+    for (int b = 0; b < IMU_BAND_N; ++b) {
+      const float step = 6.2831853071795865f * IMU_BAND_FREQS[b] / (float)IMU_BAND_RATE_HZ;
+      float re = 0.0f, im = 0.0f;
+      for (int i = 0; i < n; ++i) {
+        const float ph = step * (float)i;
+        const float v = a_mag[i] - mean;
+        re += v * cosf(ph);
+        im += v * sinf(ph);
+      }
+      band_sum += 2.0f * sqrtf(re * re + im * im) / (float)n;
+    }
+    const float bb = band_sum / (float)IMU_BAND_N;
+    float den = out[13];  // mag_std, computed above
+    if (den < 1e-6f) den = 1e-6f;
+    out[k++] = bb;
+    out[k++] = bb / den;
   }
 }
 

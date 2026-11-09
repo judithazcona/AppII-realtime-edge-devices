@@ -34,7 +34,15 @@ FEATURE_NAMES: tuple[str, ...] = (
     "mag_mean", "mag_std", "mag_max", "mag_min",
     *(f"g{a}_{k}" for a in AXES for k in ("std", "jerk")),
     "gmag_mean", "gmag_max",
+    # breathing band of the demeaned acceleration magnitude, 0.15-0.90 Hz (0.1-1.0 Hz band)
+    "bb_energy", "bb_ratio",
 )
+
+#: sample rate the band features assume - MPU_SAMPLE_RATE_HZ in firmware/config.h
+BAND_RATE_HZ = 100.0
+#: five discrete frequencies inside the 0.1-1.0 Hz breathing band. 2.5 s windows only
+#: resolve 0.4 Hz apart, so these are evaluated at arbitrary frequencies, not FFT bins.
+BAND_FREQS = (0.15, 0.30, 0.50, 0.70, 0.90)
 
 #: the non-negative amplitude-like features that get log1p (everything but the zcr counts)
 LOG_FEATURES: frozenset[str] = frozenset(n for n in FEATURE_NAMES if not n.endswith("zcr"))
@@ -66,18 +74,41 @@ def window_features(win: np.ndarray) -> np.ndarray:
         c = x - x.mean()
         feats += [_std(c), float(np.mean(np.abs(c))), float(np.mean(np.abs(np.diff(x)))),
                   _zcr(c)]
-    feats += [float(a_mag.mean()), _std(a_mag - a_mag.mean()),
-              float(a_mag.max()), float(a_mag.min())]
+    a_std = _std(a_mag - a_mag.mean())
+    feats += [float(a_mag.mean()), a_std, float(a_mag.max()), float(a_mag.min())]
     for k in range(3):
         x = gyro[:, k]
         c = x - x.mean()
         feats += [_std(c), float(np.mean(np.abs(np.diff(x))))]
     feats += [float(g_mag.mean()), float(g_mag.max())]
+    # breathing band: mean |DFT| amplitude at BAND_FREQS of the demeaned magnitude, and that
+    # band as a fraction of the total std (calm and fast breathing both live here; the axes
+    # features above cannot tell them apart from any other slow motion, this can)
+    band = _band_amplitudes(a_mag)
+    band_e = float(band.mean())
+    feats += [band_e, band_e / max(a_std, 1e-6)]
 
     out = np.asarray(feats, dtype=np.float64)
     if out.shape != (N_FEATURES,):
         raise AssertionError(f"feature vector is {out.shape}, expected ({N_FEATURES},)")
     return out
+
+
+def _band_amplitudes(x: np.ndarray) -> np.ndarray:
+    """|DFT| amplitude, scaled to signal units, at each BAND_FREQS of the demeaned signal.
+
+    Not an FFT: a 2.5 s window resolves only 0.4 Hz apart, which cannot separate 0.2 Hz from
+    0.8 Hz usefully. Evaluating the transform at five chosen frequencies is O(5N) and needs
+    no transform buffer, so `firmware/features.h` computes the same five numbers.
+    """
+    x = x - x.mean()  # the magnitude carries ~1 g of gravity; that DC must not leak in
+    n = x.size
+    k = np.arange(n, dtype=np.float64)
+    out = []
+    for f in BAND_FREQS:
+        phase = 2.0 * np.pi * f * k / BAND_RATE_HZ
+        out.append(2.0 * float(np.hypot(x @ np.cos(phase), x @ np.sin(phase))) / n)
+    return np.asarray(out)
 
 
 def _zcr(centred: np.ndarray) -> float:

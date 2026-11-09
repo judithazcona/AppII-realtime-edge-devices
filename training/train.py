@@ -172,14 +172,18 @@ def assign_splits(by_class: dict[str, list[Path]],
             continue
         trainable.append(cls)
 
+        # With two sessions the honest choice is 1 to fit + 1 to hold out, not 2 to fit and
+        # nothing measured - "no held-out session at all" is how calm and fast breathing came
+        # out at 0 % recall earlier. The 1-of-2 held-out number is weak and says so below.
+        min_fit = 1 if n == 2 else MIN_TRAIN_PER_CLASS
         want = {"test": max(1, round(n * 0.25)), "val": max(1, round(n * 0.25))}
-        budget = n - MIN_TRAIN_PER_CLASS  # what may be reserved without starving the fit
+        budget = n - min_fit  # what may be reserved without starving the fit
         want = {k: min(v, budget) for k, v in want.items()}
         want["val"] = min(want["val"], budget - want["test"])
         have = Counter(assignment[n2] for n2 in names if n2 in assignment)
 
         # Repair first: honouring an old reservation must never starve the fit.
-        deficit = MIN_TRAIN_PER_CLASS - have["train"]
+        deficit = min_fit - have["train"]
         held_out = [nm for nm in fresh + sorted(nm for nm in names if nm in existing)
                     if assignment.get(nm) in ("val", "test", "unused")]
         for name in held_out:
@@ -187,8 +191,19 @@ def assign_splits(by_class: dict[str, list[Path]],
                 break
             assignment[name] = "train"
             deficit -= 1
-            print(f"  note: {name} -> train ({cls} needs {MIN_TRAIN_PER_CLASS} fitting "
+            print(f"  note: {name} -> train ({cls} needs {min_fit} fitting "
                   f"sessions; any earlier score for {cls} used a different split)")
+
+        # ... and the mirror repair: a class with nothing held out cannot be measured at all,
+        # so give it one session. Deterministic: last movable name in the same fixed order.
+        if have["test"] + have["val"] == 0 and budget >= 1:
+            movable = [nm for nm in fresh + sorted(nm for nm in names if nm in existing)
+                       if assignment.get(nm) == "train"]
+            if movable:
+                name = movable[-1]
+                assignment[name] = "test"
+                print(f"  note: {name} -> test ({cls} had no held-out session; its recall is "
+                      f"measured on ONE session, so treat it as a smoke test, not a score)")
 
         have = Counter(assignment[n2] for n2 in names)
         need_test = max(0, want["test"] - have["test"])
