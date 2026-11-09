@@ -5,12 +5,14 @@ project gets 0 points**, no matter how well the device works.
 
 1. **The repository must be shared on GitHub with the user `tomasvicar`**
    (Settings → Collaborators) **before the lab ends.**
-   Status right now: invitation `342422359` sent 2026-11-09 13:21, **still PENDING — he has to
-   accept it, and he is not in the collaborator list yet.** Ask him in person; do not leave it
-   to the last minute, and re-check that he appears in the **collaborator** list rather than
-   only in the pending invitations:
+   Status: ✅ **SATISFIED, checked 15:26.** He is in the **collaborator list**, not merely in
+   pending invitations:
    `gh api repos/judithazcona/AppII-realtime-edge-devices/collaborators --jq '.[].login'`
-   `gh api repos/judithazcona/AppII-realtime-edge-devices/invitations --jq '.[].invitee.login'`
+   → `tomasvicar`, `sami-furqan`, `judithazcona`, `yarenuo`, and the invitations list is now
+   empty. (Invitation `342422359` was sent 13:21 and accepted in the meantime.)
+   **Re-check it once more before the demo** — this rule is worth 0 points for the whole project
+   if it lapses, and the check costs two seconds:
+   `gh api repos/judithazcona/AppII-realtime-edge-devices/collaborators --jq '.[].login'`
 
 2. **At least 3 intermediate commits during the lab, each pushed to GitHub as we go.**
    A single commit at the end is not enough. Every step in `PLAN.md` is one commit, and the

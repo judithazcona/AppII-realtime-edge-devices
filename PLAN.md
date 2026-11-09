@@ -8,9 +8,11 @@ Status: **2026-11-09, 15:25** — mid-lab, **~65 min behind the 13:50 plan** (re
 
 1. **Share the repository on GitHub with `tomasvicar`** (Settings → Collaborators) **before
    the lab ends.**
-   Current status: ❌ **PENDING.** Invitation `342422359` was sent 2026-11-09 13:21 and has not
-   expired, but `tomasvicar` is not yet in the collaborator list — he has to accept it.
-   **Action: ask him in person to accept the invitation, then re-check the list.**
+   Current status: ✅ **SATISFIED — checked 15:26.** `tomasvicar` is in the **collaborator list**
+   (`tomasvicar`, `sami-furqan`, `judithazcona`, `yarenuo`) and the invitation list is empty, so
+   invitation `342422359` (sent 13:21) has been accepted.
+   **Action left: re-run the check once before the demo** — if he were somehow removed again the
+   project scores 0 regardless of the device.
    Re-check with:
    ```bash
    gh api repos/judithazcona/AppII-realtime-edge-devices/collaborators --jq '.[].login'
@@ -314,9 +316,10 @@ cheap partial credit — README (1) plus the BLE characteristic that was already
 than watching a four-class attempt fail at 16:55 with nothing on the LED.
 
 **Never cut:** commits (compulsory rule 2 — even a cut feature gets its commit), the README
-(1 point and the only thing the teacher opens first), and re-checking that `tomasvicar` is in
-the collaborator list (compulsory rule 1, still pending — ask him in person **now**, it is not
-something to discover at 16:55).
+(1 point and the only thing the teacher opens first), and re-checking that `tomasvicar` is still
+in the collaborator list (compulsory rule 1 — **satisfied and verified at 15:26**: collaborators
+`tomasvicar`, `sami-furqan`, `judithazcona`, `yarenuo`, pending invitations empty). Re-run that
+two-second `gh api` check before the demo instead of trusting this line.
 
 Cut order if we fall behind: board web page (1) → shrink the extension to margin-only (1.5) →
 simplify the BLE alarms but keep the page (1.5). The 5 points in E and F are protected.
@@ -359,7 +362,7 @@ nRF Connect and explain the Web Bluetooth secure-context requirement.
 | --- | --- | --- |
 | Commit 1 reached GitHub | `git ls-remote origin` + `git rev-parse judithbranch` | hash matched `2465333…` on `refs/heads/judithbranch` |
 | `.gitignore` really ignores data/secrets | created `probe.wav`-equivalent probe files, `git check-ignore -v`, then deleted | matched `*.wav`, `.env`, `secrets.h`, `.venv/`; none in `git status` (audio patterns now replaced by IMU ones) |
-| `tomasvicar` access (compulsory rule 1) | `gh api .../collaborators`, `gh api .../invitations` | ❌ **pending** — invitation `342422359` for `tomasvicar` exists and has not expired, but he is not in the collaborators list yet |
+| `tomasvicar` access (compulsory rule 1) | `gh api .../collaborators`, `gh api .../invitations`, re-run 15:26 | ✅ **satisfied** — collaborators are `tomasvicar`, `sami-furqan`, `judithazcona`, `yarenuo`; invitation `342422359` (sent 13:21) accepted, pending list now empty |
 | Repo visibility | `gh repo view --json visibility` | `PUBLIC` (confirmed intended by Judith) |
 | Toolchain installed and usable | `arduino-cli version`, `core list`, `lib list`, `board details --fqbn esp32:esp32:esp32s3` | arduino-cli 1.5.2-rc.1, `esp32:esp32 3.3.12`, NimBLE-Arduino 2.3.9, Adafruit NeoPixel 1.15.4; FQBN resolves to **ESP32S3 Dev Module** |
 | Board detected, driver needed? | `arduino-cli board list`; `Get-PnpDevice` | **COM4**, `USB\VID_1A86&PID_55D3` = WCH **CH9102** bridge, status `OK` → **no driver install, no admin rights used** |
