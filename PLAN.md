@@ -38,8 +38,9 @@ Status: **2026-11-09, 15:25** — mid-lab, **~65 min behind the 13:50 plan** (re
 | Lab start | **13:00** (confirmed) |
 | Lab length | 4 hours |
 | Lab end | **17:00** |
-| Now | 16:12 → **48 min of lab time left** |
-| **Commits pushed since lab start** | **10** counting this one (9 already on GitHub: `2465333` `9f71414` `bec06c2` `bb53ade` `6d11b52` `10374fc` `d1e02ff` `706a8a7` `0df21a9`) — `git rev-list --count origin/judithbranch --since='2026-11-09T13:00:00+01:00'`, re-run after every push |
+| Now | 16:38 → **22 min of lab time left** |
+| **Commits pushed since lab start** | **12** counting this one (11 already local+pushed: `2465333` `9f71414` `bec06c2` `bb53ade` `6d11b52` `10374fc` `d1e02ff` `706a8a7` `0df21a9` `cbc1fb6` `81b5e49`) — `git rev-list --count origin/judithbranch --since='2026-11-09T13:00:00+01:00'`, re-run after every push |
+| Remaining work, in the order that keeps the marks | (1) **upload `firmware/classifier` and watch the LED** — step 6 is not done until the hardware changes colour, and it is 2.5 + 2.5 points of the grade; (2) re-export 4-class once there are >= 4 chest sessions per class and repeat; (3) BLE + board web page + abstention only if time survives. Compulsory rules are already safe: `tomasvicar` is a collaborator and 12 commits are pushed. |
 
 > Print that count every time this tracker is updated (rule 9); it is the evidence for
 > compulsory rule 2. The minimum is 3, so the count must read **3 or more well before 16:30**,
@@ -62,8 +63,9 @@ step is run and shown immediately after that step's push.
 | 4 | Data recorder: `firmware/data_recorder`, `training/record.py`, `training/config.py`, `data/README.md`, pyproject + uv.lock | `d1e02ff` | 2026-11-09 15:25:59 +01:00 | yes — `ls-remote` = local HEAD, `gh api` newest = `d1e02ff` |
 | 4b | Compliance: `tomasvicar` accepted, rule 1 recorded as satisfied | `706a8a7` | 2026-11-09 15:27:46 +01:00 | yes |
 | 4c | Recorder accepts the chest classes (`calm_breathing`, `fast_breathing`) | `0df21a9` | 2026-11-09 15:51:49 +01:00 | yes — verified with `--class calm_breathing --help` (exit 0) and `--class breathing` (exit 2) |
-| 5 | Trained model and honest evaluation: `features.py`, `train.py`, `model_weights.h`, `split_assignment.json` | this commit (hash recorded in the next row) | recorded in the next row | yes — proof run right after this push |
-| 6 | Firmware on the board: movement vs shaking | — | — | no |
+| 5 | Trained model and honest evaluation: `features.py`, `train.py`, `model_weights.h`, `split_assignment.json` | `cbc1fb6` | 2026-11-09 16:02:19 +01:00 | yes — proof run right after that push |
+| 5b | Exported header compiles as C++ (`1f` → `1.0f`); split no longer starves a class of training sessions | `81b5e49` | 2026-11-09 16:18:21 +01:00 | yes — pushed with the step-6 commit below; the proof is the one printed under it, which lists `81b5e49` in `origin/judithbranch` |
+| 6 | On-chip classifier: `features.h`, `model_infer.h`, `firmware/classifier` — compiled, **not yet uploaded** | this commit (hash recorded in the next row) | recorded in the next row | no — not pushed yet |
 | 7 | Breathing: four states on the LED | — | — | no |
 | 8 | BLE state characteristic + GitHub Pages monitor | — | — | no |
 | 9 | Board's own web page (Wi-Fi hotspot) | — | — | no |
@@ -224,6 +226,22 @@ in numpy → **max |Δp| = 7.4e-10**; the same command twice gives a **byte-iden
 (seed rule holds). The split is committed in `training/split_assignment.json`, so adding
 sessions later cannot move a test session into train.
 
+**Update, 16:35 — the first chest sessions are in, and the four-class run is honest about not
+being ready.** With `calm_breathing` and `fast_breathing` at two sessions each (both from the
+same person and placement), each breathing class had to be used entirely for fitting — there is
+nothing left to hold out, so their recall prints `-`. Worse, and more interesting: the held-out
+`not_attached` session `lap_pocket` is now read as **calm_breathing 24 / fast_breathing 11**,
+test accuracy 50 %. A board in a lap pocket moves with the person exactly like a board on a
+chest does, and two takes per breathing class cannot teach the difference. Two things follow,
+both recorded so nobody reads 100 % off the two-class table again:
+
+* the exported model stays **2-class** until there are **>= 4 sessions per breathing class**,
+  from >= 2 people and >= 2 placements, with `not_attached` recorded on a person who is sitting
+  as well as lying on the table;
+* `train.py` now refuses to reserve validation/test sessions from a class that would then have
+  too little to fit on (`81b5e49`) — the bug that hid this was silently scoring a class that had
+  zero training data as 0 % instead of as "not trained".
+
 Two bugs the checks caught, both worth remembering: sklearn fits **one** logistic unit for two
 classes (the first header had 16×1 layer-2 weights and one bias), and widening it as
 `softmax(-z, +z)` is `sigmoid(2z)` — a factor-2 error that showed up as 9e-3 in the export
@@ -257,6 +275,35 @@ check before it could reach the chip. Fixed with `(-z/2, +z/2)`.
 - **No Serial dependency.** Measure inference time per window and free heap.
 - **Proof:** slow move → blue, shake → magenta, repeatedly, **powered from a power bank**;
   inference time + heap figures.
+
+**Result (compiled, not yet on the board).** Three files:
+[`firmware/features.h`](firmware/features.h) (the 24 features in C, one-to-one with
+`features.py`: population std, MAD, `mean|x[n+1]-x[n]|` jerk not divided by dt, zcr with
+`sign(0)=0`, tri-axial magnitude, gyro std/jerk — no FFT, no sort, nothing that needs a
+transform buffer), [`firmware/model_infer.h`](firmware/model_infer.h) (relu layer, shifted
+softmax, argmax, runner-up margin for step 10) and
+[`firmware/classifier/classifier.ino`](classifier/classifier.ino) (100 Hz drift-corrected
+sampling, 250 × 6 window slid by 125, features → log1p → standardise → MLP, **two agreeing
+windows before the LED moves**, colour chosen by `strcmp` on `MODEL_CLASS_NAMES` so a 4-class
+re-export needs no edit here).
+
+- `grep -c Serial firmware/classifier/classifier.ino` → **0** (rule 7 in its strongest form: a
+  sketch that cannot talk to a host even by accident; the comment is worded so the grep stays a
+  usable check).
+- Compile: **323042 bytes (24 %)** flash, **29664 bytes (9 %)** RAM, FQBN
+  `esp32:esp32:esp32s3:FlashMode=dio,FlashSize=16M,PSRAM=disabled,CDCOnBoot=default`.
+- Three `static_assert`s tie `config.h` to the exported header (window, stride, rate, feature
+  count): a drift between the notebook and the chip fails the build instead of the demo.
+- Dead bus does not freeze the last colour: it blinks **amber** at ~1.7 s period, because with
+  no serial the LED is also the error channel.
+- **NOT proven yet:** nothing has been uploaded (`COM4` was held by the recorder while the
+  sessions were recorded), so the LED colours, the 2 s smoothing, the inference time per window,
+  the free heap and the power-bank boot are all still open. Uploading and watching it is the
+  next thing done on the bench, and until that happens step 6 is not done.
+- **Feature parity is not proven either.** `train.py`'s export check proves the weights survived
+  serialisation (`max |dp| = 7.4e-10`), not that `features.h` computes what `features.py`
+  computed. That needs one window run on the chip and compared to Python — the first thing to do
+  once the port is free.
 
 ### Step 7 — breathing: four states
 - Retrain with the chest sessions; keep the two easy classes working.

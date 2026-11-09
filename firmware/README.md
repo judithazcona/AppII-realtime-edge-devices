@@ -150,11 +150,36 @@ $p.Close()
 | [`bench_test/`](bench_test/bench_test.ino) | **yes — the only sketch allowed to** (rule 7) | I²C scan, `WHO_AM_I`, 10 s accel/gyro table | one device at `0x68`; `WHO_AM_I` = `0x68` (genuine MPU-6050); 909 good reads / 0 failed at 100 Hz; gravity 0.98–0.99 g at rest |
 | [`led_test/`](led_test/led_test.ino) | **no** | drives red, green, blue, magenta on GPIO 48, then tries GPIO 38, forever, on power alone | the on-board LED lit on **GPIO 48**; GPIO 38 stayed dark — observed by Judith at 14:35 |
 | [`data_recorder/`](data_recorder/data_recorder.ino) | **yes — the second and last exception** (rule 7) | streams accel + gyro at a fixed 100 Hz as CSV rows for the dataset | **100.00 Hz delivered** (1200 samples in 11.99 s), median dt 10.00 ms, p99 10.01 ms, **0 gaps** |
+| [`classifier/`](classifier/classifier.ino) | **no** | the graded firmware: 100 Hz sampling → 24 features → exported MLP → smoothed decision → LED colour | compiles to **323042 bytes (24 %)** flash, **29664 bytes (9 %)** RAM; `grep -c Serial` reads **0**; not uploaded yet, `COM4` was held by the recorder |
 | [`config.h`](config.h) | — | pins, I²C address, full-scale ranges, sample rate, window size | shared by every sketch; paired with `HARDWARE.md` |
+| [`features.h`](features.h) / [`model_infer.h`](model_infer.h) | — | the 24 window features and the MLP forward pass, in C | same formulas as `training/features.py`; included by `classifier` only |
 
 `led_test` is deliberately written with **zero** `Serial` calls: it is the standing check that
 this firmware family reaches its working state from a power bank with no host attached
-(rule 11).
+(rule 11). `classifier` is written with zero as well, and that is not a style choice: it is the
+demo sketch, so the absence of the token is what proves the cable can stay unplugged.
+
+### 7.1 `classifier/` — the graded build
+
+```powershell
+& $CLI compile --fqbn $FQBN firmware/classifier   # 323042 bytes (24%), 29664 bytes (9%) RAM
+& $CLI upload  -p COM4 --fqbn $FQBN firmware/classifier   # NOT RUN YET: COM4 held by record.py
+```
+
+The chain, all on the chip: MPU-6050 at 100 Hz → 250-sample window (2.5 s) re-run every 125
+samples → the 24 features from `features.h` → `log1p` and standardisation with the parameters
+`train.py` fitted on **train sessions only** → the MLP in `model_infer.h` → two agreeing
+windows in a row → one colour. `config.h` supplies the pins and the rate, `model_weights.h`
+supplies the class names, and the sketch maps names to colours, so re-exporting a 4-class model
+needs no edit here.
+
+Three `static_assert`s refuse to build if `config.h` and the exported header disagree about the
+window, the stride, the sample rate or the feature count — the drift that would otherwise show
+up as "the board disagrees with the notebook".
+
+If the sensor stops answering (cable pulled, I²C dead), the LED blinks **amber** at ~1.7 s
+period instead of freezing on the last state. There is no serial to complain into, so the LED
+carries that message too.
 
 ## 8. Recording dataset sessions (cable attached on purpose)
 
