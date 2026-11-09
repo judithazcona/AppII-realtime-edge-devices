@@ -33,6 +33,7 @@
 #include <Wire.h>
 
 #include <Adafruit_NeoPixel.h>
+#include <NimBLEDevice.h>
 
 #include "../config.h"
 #include "../features.h"
@@ -74,6 +75,51 @@ static int g_state = -1;      // the class the LED is showing
 static bool g_sensorDead = false;
 
 static Adafruit_NeoPixel led(RGB_LED_COUNT, RGB_LED_PIN, NEO_GRB + NEO_KHZ800);
+
+// --------------------------------------------------------------------- BLE ---
+// One service, one characteristic, READ + NOTIFY. The value is the current SMOOTHED state as
+// plain UTF-8 text - exactly one of the MODEL_CLASS_NAMES, no newline, no decoration - so the
+// monitor page does not have to parse anything. It is pushed when the state changes and again
+// once a second as a heartbeat, which is also how a browser tells the board went away.
+static NimBLECharacteristic *g_stateChr = nullptr;
+static uint32_t lastBeatMs = 0;
+static const uint32_t HEARTBEAT_MS = 1000;
+
+class ServerCbs : public NimBLEServerCallbacks {
+  void onDisconnect(NimBLEServer *, NimBLEConnInfo &, int) override {
+    // A monitor page that loses the link must be able to come back without a power cycle, so
+    // advertising restarts the moment the client leaves.
+    NimBLEDevice::startAdvertising();
+  }
+};
+static ServerCbs g_serverCbs;
+
+static void startBle() {
+  NimBLEDevice::init(BLE_DEVICE_NAME);
+  NimBLEServer *srv = NimBLEDevice::createServer();
+  srv->setCallbacks(&g_serverCbs);
+  NimBLEService *svc = srv->createService(BLE_SERVICE_UUID);
+  g_stateChr = svc->createCharacteristic(BLE_STATE_CHAR_UUID,
+                                         NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY,
+                                         BLE_STATE_MAX_LEN);
+  svc->start();
+  NimBLEAdvertising *adv = NimBLEDevice::getAdvertising();
+  adv->addServiceUUID(BLE_SERVICE_UUID);  // so the monitor page can filter on it
+  adv->start();
+}
+
+// Published value: the class name from the exported header, or empty before the first decision
+// (an empty read is honest - the board has not classified anything yet).
+static const char *stateText() {
+  if (g_state < 0 || g_state >= MODEL_N_CLASSES) return "";
+  return MODEL_CLASS_NAMES[g_state];
+}
+
+static void publishState() {
+  if (g_stateChr == nullptr) return;
+  g_stateChr->setValue(stateText());  // READ is always current, connected or not
+  if (NimBLEDevice::getServer()->getConnectedCount() > 0) g_stateChr->notify();
+}
 
 // ------------------------------------------------------------- MPU-6050 --------
 static void regWrite(uint8_t reg, uint8_t value) {
@@ -190,7 +236,8 @@ static void evaluateWindow() {
   }
   if (g_state != winner) {
     g_state = winner;
-    show(colourFor(g_state));
+    show(colourFor(g_state));  // same event, both channels: the LED and the BLE notification
+    publishState();
   }
 }
 
@@ -224,10 +271,20 @@ void setup() {
   bootSweep();  // tells us the LED and the sketch are alive with no host attached
   if (g_sensorDead) indicateFault(millis());
 
+  startBle();  // advertises and moves on; nothing here waits for a central to connect
+
   nextUs = micros() + PERIOD_US;
 }
 
 void loop() {
+  // Heartbeat: the state goes out once a second as well as on every change, so a monitor page
+  // can tell "calm" from "the board is gone". Runs before the sample schedule returns early.
+  const unsigned long beatMs = millis();
+  if (beatMs - lastBeatMs >= HEARTBEAT_MS) {
+    lastBeatMs = beatMs;
+    publishState();
+  }
+
   const uint32_t now = micros();
   if ((int32_t)(now - nextUs) < 0) {
     if (g_sensorDead) indicateFault(millis());

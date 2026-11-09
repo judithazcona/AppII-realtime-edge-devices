@@ -73,6 +73,17 @@
 // DLPF bandwidth 44 Hz (CONFIG = 0x03) with a 1 kHz gyro rate.
 #define MPU_CONFIG_VAL_DLPF_44HZ 0x03
 
+// --------------------------------------------------------------------- BLE ---
+// Generated once with `uv run python -c "import uuid; print(uuid.uuid4())"` on 2026-11-09 and
+// kept here so the monitor page and the firmware cannot drift apart (docs/BLE.md repeats them).
+// Random 128-bit UUIDs: nothing else in the lab advertises these.
+#define BLE_DEVICE_NAME "AppII-Monitor"
+#define BLE_SERVICE_UUID "53bc7f1a-6719-4a10-917d-11be1aba66a3"
+#define BLE_STATE_CHAR_UUID "e8507aa2-f631-4a05-893c-2a781f9d5be3"
+// READ + NOTIFY. Value is the current smoothed state as plain UTF-8, one of the
+// MODEL_CLASS_NAMES, with no newline and no other characters.
+#define BLE_STATE_MAX_LEN 32
+
 // ------------------------------------------------------------------ model ---
 // Feature window used by the firmware and by the training scripts. 2.5 s at
 // 100 Hz = 250 samples, 50 % overlap -> a new decision every 1.25 s.
