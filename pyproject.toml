@@ -3,5 +3,7 @@ name = "appii"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "numpy>=2.5.4",
     "pyserial>=3.5",
+    "scikit-learn>=1.9.1",
 ]

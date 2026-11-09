@@ -38,8 +38,8 @@ Status: **2026-11-09, 15:25** — mid-lab, **~65 min behind the 13:50 plan** (re
 | Lab start | **13:00** (confirmed) |
 | Lab length | 4 hours |
 | Lab end | **17:00** |
-| Now | 15:25 → **1 h 35 min of lab time left** |
-| **Commits pushed since lab start** | **7** counting this one (6 already on GitHub: `2465333` `9f71414` `bec06c2` `bb53ade` `6d11b52` `10374fc`) — `git rev-list --count origin/judithbranch --since='2026-11-09T13:00:00+01:00'`, re-run after every push |
+| Now | 16:12 → **48 min of lab time left** |
+| **Commits pushed since lab start** | **10** counting this one (9 already on GitHub: `2465333` `9f71414` `bec06c2` `bb53ade` `6d11b52` `10374fc` `d1e02ff` `706a8a7` `0df21a9`) — `git rev-list --count origin/judithbranch --since='2026-11-09T13:00:00+01:00'`, re-run after every push |
 
 > Print that count every time this tracker is updated (rule 9); it is the evidence for
 > compulsory rule 2. The minimum is 3, so the count must read **3 or more well before 16:30**,
@@ -59,8 +59,10 @@ step is run and shown immediately after that step's push.
 | 3 | Wiring and sensor check: `HARDWARE.md`, `config.h`, `bench_test`, `led_test` | `bb53ade` | 2026-11-09 14:33:57 +01:00 | yes — `ls-remote` + `gh api` both showed `bb53ade`, proof run right after the push |
 | 3b | Wiring photo: `docs/wiring.jpg` compressed to 93 KB, EXIF/GPS stripped | `6d11b52` | 2026-11-09 14:47:49 +01:00 | yes — `ls-remote` = local HEAD, `gh api` newest = `6d11b52`, and the rendered README contains `<img src="docs/wiring.jpg">` |
 | 3c | `firmware/README.md` with the exact arduino-cli commands; close the step-3 leftovers in this plan | `10374fc` | 2026-11-09 15:01:19 +01:00 | yes — `ls-remote` = local HEAD, `gh api` newest = `10374fc`, 6 commits since 13:00 |
-| 4 | Data recorder: `firmware/data_recorder`, `training/record.py`, `training/config.py`, `data/README.md`, pyproject + uv.lock | this commit (hash recorded in the next row) | recorded in the next row | yes — proof run right after this push |
-| 5 | Trained model and honest evaluation | — | — | no |
+| 4 | Data recorder: `firmware/data_recorder`, `training/record.py`, `training/config.py`, `data/README.md`, pyproject + uv.lock | `d1e02ff` | 2026-11-09 15:25:59 +01:00 | yes — `ls-remote` = local HEAD, `gh api` newest = `d1e02ff` |
+| 4b | Compliance: `tomasvicar` accepted, rule 1 recorded as satisfied | `706a8a7` | 2026-11-09 15:27:46 +01:00 | yes |
+| 4c | Recorder accepts the chest classes (`calm_breathing`, `fast_breathing`) | `0df21a9` | 2026-11-09 15:51:49 +01:00 | yes — verified with `--class calm_breathing --help` (exit 0) and `--class breathing` (exit 2) |
+| 5 | Trained model and honest evaluation: `features.py`, `train.py`, `model_weights.h`, `split_assignment.json` | this commit (hash recorded in the next row) | recorded in the next row | yes — proof run right after this push |
 | 6 | Firmware on the board: movement vs shaking | — | — | no |
 | 7 | Breathing: four states on the LED | — | — | no |
 | 8 | BLE state characteristic + GitHub Pages monitor | — | — | no |
@@ -197,6 +199,36 @@ boot, so a recorder connecting later never learned the rate (fixed: `H` re-sends
 - **Proof:** file list with durations per class; a plot of one session per class.
 
 ### Step 5 — trained model and honest evaluation
+**Result, 16:12 — the 2-class model trains, exports and reproduces.** `training/features.py`
+defines 24 hand-made features per 2.5 s window; `training/train.py` splits whole sessions,
+trains a 24-16-2 ReLU MLP, prints held-out-session metrics and writes
+`firmware/model_weights.h` (7.8 KB) with the preprocessing baked in.
+
+| Held-out **test sessions** (`lap_pocket` + `vigorous_arm`) | not_attached | shaking | recall |
+| --- | --- | --- | --- |
+| true not_attached | **35** | 0 | 100 % |
+| true shaking | 0 | **35** | 100 % |
+| | | | **70/70 = 100 %** |
+
+That 100 % is **not the number to quote in the demo** — two sessions per class is enough to
+prove the chain works, not to claim performance. The honest picture is on **validation**, where
+the seeded split happened to hold out the two hardest takes (`pickup_putdown` as not_attached,
+`gentle_small` as shaking) and the model got **82.6 %**, confusing 10 handling windows with
+shaking. A logistic regression on the same features also gets 100 % on that test set, so the
+MLP earns its bytes only if it stays better as classes are added.
+
+Everything that was measured rather than assumed: **window 250 samples / stride 125 read out of
+`firmware/config.h`**, not copied (the training side cannot drift from the ring buffer);
+scaler fitted on **train sessions only**; export re-read from the header and forward-propagated
+in numpy → **max |Δp| = 7.4e-10**; the same command twice gives a **byte-identical** report
+(seed rule holds). The split is committed in `training/split_assignment.json`, so adding
+sessions later cannot move a test session into train.
+
+Two bugs the checks caught, both worth remembering: sklearn fits **one** logistic unit for two
+classes (the first header had 16×1 layer-2 weights and one bias), and widening it as
+`softmax(-z, +z)` is `sigmoid(2z)` — a factor-2 error that showed up as 9e-3 in the export
+check before it could reach the chip. Fixed with `(-z/2, +z/2)`.
+
 - Window 2–4 s at 50–100 Hz with ~50 % overlap; **split whole sessions first** (rule 5).
 - Features per window: tri-axial magnitude plus per-axis mean, std, min/max, RMS, dominant
   frequency / zero-crossing rate, gyro magnitude, inter-axis correlation; log transform on the

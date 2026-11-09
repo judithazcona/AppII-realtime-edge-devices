@@ -1,0 +1,14 @@
+{
+  "_comment": "Whole-session split assigned before windowing (AGENTS.md rule 9). Committed so every experiment is evaluated on the same held-out sessions.",
+  "seed": 20261109,
+  "sessions": {
+    "session001_shaking__gentle_small.csv": "val",
+    "session002_not_attached__table_still.csv": "train",
+    "session002_shaking__vigorous_arm.csv": "test",
+    "session003_not_attached__hand_loose.csv": "train",
+    "session003_shaking__side_to_side.csv": "train",
+    "session004_not_attached__lap_pocket.csv": "test",
+    "session004_shaking__wobble_rotation.csv": "train",
+    "session005_not_attached__pickup_putdown.csv": "val"
+  }
+}
