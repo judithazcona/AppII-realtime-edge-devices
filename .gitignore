@@ -1,0 +1,71 @@
+# --- Python / uv ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.python-version
+# keep pyproject.toml and uv.lock tracked
+uv.toml
+
+# --- Secrets: never commit these (rule 11) ---
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.crt
+secrets.h
+secrets.json
+credentials.json
+*_token*
+# template pattern: commit wifi_credentials.example.h, not wifi_credentials.h
+*_credentials.h
+
+# --- Raw data and generated datasets (rule 11) ---
+data/raw/
+data/recordings/
+data/processed/
+data/external/
+*.wav
+*.flac
+*.mp3
+*.ogg
+*.m4a
+*.aac
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.h5
+*.hdf5
+*.npz
+*.npy
+*.pt
+*.pth
+*.onnx
+# quantised / converted model binaries stay out of the repo
+*.tflite
+*.ulp
+*.bin
+
+# --- Firmware build output ---
+build/
+.cxx/
+cmake-build-*/
+.sdkconfig
+sdkconfig.*
+managed_components/
+dependencies.lock
+partitions/*.bin
+bootloader_signing_key.pem
+.cache/
+
+# --- Logs, notebooks, tooling noise ---
+*.log
+.ipynb_checkpoints/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
