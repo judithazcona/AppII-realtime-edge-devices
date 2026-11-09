@@ -7,7 +7,7 @@ __pycache__/
 # keep pyproject.toml and uv.lock tracked
 uv.toml
 
-# --- Secrets: never commit these (rule 11) ---
+# --- Secrets: never commit these (public repo, rule 16) ---
 .env
 .env.*
 *.key
@@ -18,35 +18,36 @@ secrets.h
 secrets.json
 credentials.json
 *_token*
-# template pattern: commit wifi_credentials.example.h, not wifi_credentials.h
+# template pattern: commit wifi_credentials.example.h, never wifi_credentials.h
 *_credentials.h
+*_credentials.example.h.bak
 
-# --- Raw data and generated datasets (rule 11) ---
+# --- Raw IMU recordings and derived datasets (rule 16) ---
+# recordings are CSV/JSON exports from the board at 50-100 Hz; keep them off the repo
 data/raw/
-data/recordings/
-data/processed/
+data/windows/
+data/features/
+data/splits/
 data/external/
-*.wav
-*.flac
-*.mp3
-*.ogg
-*.m4a
-*.aac
-*.zip
-*.tar
-*.tar.gz
-*.tgz
+*.csv.gz
+*.parquet
+*.npy
+*.npz
 *.h5
 *.hdf5
-*.npz
-*.npy
+# trained models and converted/embedded weights stay out too
 *.pt
 *.pth
+*.joblib
+*.pickle
 *.onnx
-# quantised / converted model binaries stay out of the repo
 *.tflite
 *.ulp
 *.bin
+
+# --- Course material stays out of the public repo (rule 2) ---
+docs/*.html
+docs/**/*.html
 
 # --- Firmware build output ---
 build/
@@ -59,9 +60,14 @@ dependencies.lock
 partitions/*.bin
 bootloader_signing_key.pem
 .cache/
+.pio/
+.pioenvs
+.piolibdeps
+arduino/local/
 
 # --- Logs, notebooks, tooling noise ---
 *.log
+*.tmp.txt
 .ipynb_checkpoints/
 .vscode/
 .idea/
